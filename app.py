@@ -3,7 +3,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
+from sklearn.cluster import DBSCAN, KMeans
 from sklearn.datasets import load_wine
+from sklearn.decomposition import PCA
+from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
+from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
 
 try:
@@ -13,6 +17,14 @@ except ImportError:
     HAS_SEABORN = False
 
 st.set_page_config(page_title="Agrupamiento de vinos", page_icon="🍷", layout="wide")
+
+RANDOM_STATE = 42
+N_INIT = 10
+K_MIN, K_MAX = 2, 10
+EPS_DEFECTO, MIN_SAMPLES_DEFECTO = 2.3, 5
+GRILLA_EPS = [1.8, 2.0, 2.2, 2.3, 2.5, 2.8, 3.0]
+GRILLA_MIN_SAMPLES = [3, 4, 5, 7, 10]
+COLOR_RUIDO = "#9e9e9e"
 
 SECCIONES = [
     "Inicio",
@@ -577,26 +589,456 @@ X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=features)
     )
 
 
+# ------------------------------------------------- Utilidades de clustering
+def matriz_para_clustering():
+    """Obtiene la matriz X de la Parte 2 y valida que sirva para agrupar."""
+    try:
+        X_final, X_raw, vars_x, scaler = obtener_datos_preprocesados()
+    except (ValueError, TypeError) as e:
+        st.error(
+            "No se pudo preparar la matriz X. Verifica que todas las columnas (salvo la etiqueta) "
+            f"sean numéricas y no tengan nulos. Detalle: {e}"
+        )
+        return None, None, None, None
+    if X_final is None:
+        return None, None, None, None
+    if X_final.isna().any().any():
+        st.error("La matriz X contiene valores nulos; K-Means y DBSCAN no pueden calcularse.")
+        return None, None, None, None
+    if X_final.shape[0] < 3:
+        st.error("Se necesitan al menos 3 registros para agrupar y calcular métricas.")
+        return None, None, None, None
+    st.caption(
+        f"Matriz X: {X_final.shape[0]} muestras × {X_final.shape[1]} variables · "
+        f"escalado: **{st.session_state.get('scaler_nombre', 'StandardScaler')}** · etiqueta externa excluida."
+    )
+    return X_final, X_raw, vars_x, scaler
+
+
+def metricas_internas(X: np.ndarray, labels: np.ndarray):
+    """Silhouette, Davies-Bouldin y Calinski-Harabasz sobre los puntos con etiqueta != -1.
+
+    Devuelve (dict, None) o (None, motivo) cuando las métricas no son calculables.
+    """
+    mascara = labels != -1
+    Xv, lv = X[mascara], labels[mascara]
+    n_grupos = len(np.unique(lv))
+    if n_grupos < 2:
+        return None, "se necesitan al menos 2 clústeres (sin contar el ruido)"
+    if n_grupos >= len(lv):
+        return None, "cada punto forma su propio clúster"
+    return {
+        "Silhouette": float(silhouette_score(Xv, lv)),
+        "Davies-Bouldin": float(davies_bouldin_score(Xv, lv)),
+        "Calinski-Harabasz": float(calinski_harabasz_score(Xv, lv)),
+    }, None
+
+
+@st.cache_data
+def evaluar_rango_k(X: np.ndarray, k_min: int, k_max: int) -> pd.DataFrame:
+    """Ajusta K-Means para cada K del rango y devuelve inertia y métricas internas."""
+    filas = []
+    for k in range(k_min, k_max + 1):
+        km = KMeans(n_clusters=k, n_init=N_INIT, random_state=RANDOM_STATE).fit(X)
+        met, _ = metricas_internas(X, km.labels_)
+        filas.append({"K": k, "Inertia": km.inertia_, **(met or {})})
+    return pd.DataFrame(filas)
+
+
+@st.cache_data
+def ajustar_kmeans(X: np.ndarray, k: int):
+    km = KMeans(n_clusters=k, n_init=N_INIT, random_state=RANDOM_STATE).fit(X)
+    return km.labels_, km.cluster_centers_, float(km.inertia_), int(km.n_iter_)
+
+
+@st.cache_data
+def distancias_k(X: np.ndarray, min_samples: int) -> np.ndarray:
+    """Distancia de cada punto a su vecino n.º min_samples (contando el propio punto), ordenada.
+
+    Un punto es núcleo en DBSCAN si esta distancia es <= eps.
+    """
+    vecinos = NearestNeighbors(n_neighbors=min_samples).fit(X)
+    dist, _ = vecinos.kneighbors(X)
+    return np.sort(dist[:, -1])
+
+
+@st.cache_data
+def ajustar_dbscan(X: np.ndarray, eps: float, min_samples: int) -> np.ndarray:
+    return DBSCAN(eps=eps, min_samples=min_samples, metric="euclidean").fit_predict(X)
+
+
+@st.cache_data
+def sensibilidad_dbscan(X: np.ndarray, eps_lista: tuple, ms_lista: tuple) -> pd.DataFrame:
+    filas = []
+    for ms in ms_lista:
+        for eps in eps_lista:
+            labels = ajustar_dbscan(X, eps, ms)
+            n_ruido = int((labels == -1).sum())
+            met, _ = metricas_internas(X, labels)
+            filas.append({
+                "eps": eps,
+                "min_samples": ms,
+                "N.º clústeres": len(set(labels)) - (1 if n_ruido else 0),
+                "N.º ruido": n_ruido,
+                "% ruido": round(100 * n_ruido / len(labels), 1),
+                "Silhouette (sin ruido)": f"{met['Silhouette']:.3f}" if met else "No calculable",
+            })
+    return pd.DataFrame(filas)
+
+
+@st.cache_data
+def proyeccion_2d(X: np.ndarray):
+    """PCA a 2 componentes SOLO para visualizar (el agrupamiento usa todas las variables)."""
+    pca = PCA(n_components=2, random_state=RANDOM_STATE)
+    return pca.fit_transform(X), pca.explained_variance_ratio_, pca
+
+
+def colores_clusters(n: int):
+    cmap = plt.get_cmap("tab10")
+    return [cmap(i % 10) for i in range(n)]
+
+
+def dibujar_heatmap(ax, datos: pd.DataFrame, cmap="vlag", fmt=".2f", centro=0.0):
+    if HAS_SEABORN:
+        sns.heatmap(datos, cmap=cmap, center=centro, annot=True, fmt=fmt, linewidths=0.5,
+                    ax=ax, annot_kws={"size": 8}, cbar_kws={"shrink": 0.8})
+    else:
+        im = ax.imshow(datos.values, cmap="coolwarm", aspect="auto")
+        plt.colorbar(im, ax=ax, shrink=0.8)
+        ax.set_xticks(range(datos.shape[1]))
+        ax.set_xticklabels(datos.columns, rotation=0)
+        ax.set_yticks(range(datos.shape[0]))
+        ax.set_yticklabels(datos.index)
+        for r in range(datos.shape[0]):
+            for c in range(datos.shape[1]):
+                ax.text(c, r, format(datos.iat[r, c], fmt), ha="center", va="center", fontsize=8)
+
+
+def tabla_vs_etiqueta(labels: np.ndarray, nombre: str):
+    """Tabla cruzada clúster vs. etiqueta externa (solo referencia posterior)."""
+    df, etiqueta = obtener_datos()
+    if not etiqueta or etiqueta not in df.columns or len(df) != len(labels):
+        return
+    with st.expander("Contraste posterior con la etiqueta externa (no se usó para agrupar)"):
+        st.caption(
+            "La etiqueta original no interviene en el entrenamiento ni en la elección de parámetros; "
+            "esta tabla solo sirve para verificar si los grupos tienen sentido."
+        )
+        cruce = pd.crosstab(pd.Series(labels, name=nombre), df[etiqueta].reset_index(drop=True).rename(etiqueta))
+        st.dataframe(cruce, width="stretch")
+
+
 # ------------------------------------------------------------------ K-Means
 def pagina_kmeans():
     st.header("🎯 Agrupamiento K-Means")
-    X_final, X_raw, vars_x, scaler = obtener_datos_preprocesados()
+    X_final, X_raw, vars_x, scaler = matriz_para_clustering()
     if X_final is None:
         return
+    X = X_final.to_numpy()
+    n = X.shape[0]
+    k_max = min(K_MAX, n - 1)
+    if k_max < K_MIN:
+        st.error(f"Con {n} registros no es posible evaluar K entre {K_MIN} y {K_MAX}.")
+        return
 
-    st.success(f"✅ Conexión con Parte 2 exitosa: Matriz lista con {X_final.shape[0]} muestras y {X_final.shape[1]} variables ({st.session_state.get('scaler_nombre', 'StandardScaler')}).")
-    st.info("📌 **Espacio listo para la Parte 3:** Slider interactivo de K (2 a 10), cálculo de curva del codo (inercia), métricas de Silhouette, Davies-Bouldin, Calinski-Harabasz y tabla de centroides/perfil.")
+    st.markdown(
+        f"K-Means con inicialización **k-means++**, `n_init={N_INIT}` y `random_state={RANDOM_STATE}`. "
+        f"Se evalúa K = {K_MIN} a {k_max} con inertia (método del codo), Silhouette, Davies-Bouldin "
+        "y Calinski-Harabasz."
+    )
+
+    tabla_k = evaluar_rango_k(X, K_MIN, k_max)
+    k_sugerido = int(tabla_k.loc[tabla_k["Silhouette"].idxmax(), "K"]) if "Silhouette" in tabla_k else K_MIN
+
+    tab_sel, tab_mod, tab_perf, tab_vis = st.tabs([
+        "1. Selección de K", "2. Modelo y métricas", "3. Perfil de clústeres", "4. Visualización",
+    ])
+
+    # 1. Selección de K
+    with tab_sel:
+        st.subheader("Curva del codo y métricas internas por K")
+        fig, axes = plt.subplots(2, 2, figsize=(12, 7.5))
+        series = [
+            ("Inertia", "Inertia (menor es mejor; siempre decrece)", "#722f37"),
+            ("Silhouette", "Silhouette (mayor es mejor)", "#2e6f40"),
+            ("Davies-Bouldin", "Davies-Bouldin (menor es mejor)", "#003366"),
+            ("Calinski-Harabasz", "Calinski-Harabasz (mayor es mejor)", "#b8860b"),
+        ]
+        for ax, (col, titulo, color) in zip(axes.flatten(), series):
+            ax.plot(tabla_k["K"], tabla_k[col], marker="o", color=color, linewidth=2)
+            ax.axvline(k_sugerido, color="red", linestyle="--", alpha=0.6, label=f"K = {k_sugerido}")
+            ax.set_title(titulo, fontsize=11, fontweight="bold")
+            ax.set_xlabel("Número de clústeres (K)")
+            ax.set_xticks(tabla_k["K"])
+            ax.grid(True, linestyle="--", alpha=0.4)
+            ax.legend(fontsize=8)
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+
+        st.dataframe(
+            tabla_k.set_index("K").style.format({
+                "Inertia": "{:.1f}", "Silhouette": "{:.3f}", "Davies-Bouldin": "{:.3f}", "Calinski-Harabasz": "{:.1f}",
+            }).highlight_max(subset=["Silhouette", "Calinski-Harabasz"], color="#c8e6c9")
+              .highlight_min(subset=["Davies-Bouldin"], color="#c8e6c9"),
+            width="stretch",
+        )
+        mejores = {
+            "Silhouette": int(tabla_k.loc[tabla_k["Silhouette"].idxmax(), "K"]),
+            "Davies-Bouldin": int(tabla_k.loc[tabla_k["Davies-Bouldin"].idxmin(), "K"]),
+            "Calinski-Harabasz": int(tabla_k.loc[tabla_k["Calinski-Harabasz"].idxmax(), "K"]),
+        }
+        coinciden = len(set(mejores.values())) == 1
+        st.info(
+            f"**K sugerido = {k_sugerido}** (máxima Silhouette). Mejor K por métrica: "
+            + ", ".join(f"{m} → {k}" for m, k in mejores.items())
+            + (". Las tres métricas coinciden." if coinciden else ". Las métricas no coinciden: revisar el codo y la interpretabilidad.")
+        )
+
+    # 2. Modelo
+    with tab_mod:
+        st.subheader("Ajuste del modelo")
+        k = st.slider("Número de clústeres K", K_MIN, k_max, min(k_sugerido, k_max), key="k_kmeans",
+                      help="Cada cambio vuelve a entrenar K-Means y recalcula las métricas.")
+        labels, centros, inertia, n_iter = ajustar_kmeans(X, k)
+        met, motivo = metricas_internas(X, labels)
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Inertia", f"{inertia:.1f}")
+        c2.metric("Silhouette", f"{met['Silhouette']:.3f}" if met else "No calculable")
+        c3.metric("Davies-Bouldin", f"{met['Davies-Bouldin']:.3f}" if met else "No calculable")
+        c4.metric("Calinski-Harabasz", f"{met['Calinski-Harabasz']:.1f}" if met else "No calculable")
+        if motivo:
+            st.warning(f"Métricas no calculables: {motivo}.")
+        st.caption(f"Convergió en {n_iter} iteraciones. Cobertura: 100 % de los puntos (K-Means no produce ruido).")
+
+        tamanos = pd.Series(labels).value_counts().sort_index()
+        tam_df = pd.DataFrame({"Clúster": tamanos.index, "Tamaño": tamanos.values,
+                               "%": (100 * tamanos.values / n).round(1)})
+        col_t, col_g = st.columns([1, 2])
+        col_t.dataframe(tam_df, hide_index=True, width="stretch")
+        fig, ax = plt.subplots(figsize=(6, 3))
+        ax.bar(tamanos.index.astype(str), tamanos.values, color=colores_clusters(k), edgecolor="black")
+        ax.set_xlabel("Clúster")
+        ax.set_ylabel("N.º de muestras")
+        ax.set_title("Tamaño de cada clúster", fontsize=11, fontweight="bold")
+        col_g.pyplot(fig)
+        plt.close(fig)
+
+        st.session_state["labels_kmeans"] = labels
+        st.session_state["kmeans_params"] = {"K": k, "n_init": N_INIT, "random_state": RANDOM_STATE, "init": "k-means++"}
+        st.session_state["kmeans_metricas"] = {"Inertia": inertia, **(met or {})}
+
+    # 3. Perfil
+    with tab_perf:
+        st.subheader(f"Perfil químico de los {k} clústeres")
+        centros_orig = pd.DataFrame(scaler.inverse_transform(centros), columns=vars_x)
+        centros_orig.index.name = "Clúster"
+        st.markdown("**Centroides en unidades originales** (media del clúster):")
+        st.dataframe(centros_orig.T.round(2), width="stretch")
+
+        medianas = X_raw.groupby(labels).median()
+        medianas.index.name = "Clúster"
+        with st.expander("Medianas por clúster (unidades originales)"):
+            st.dataframe(medianas.T.round(2), width="stretch")
+
+        st.markdown("**Centroides estandarizados** (cuántas desviaciones se alejan de la media global):")
+        centros_z = pd.DataFrame(centros, columns=vars_x)
+        centros_z.index = [f"C{i}" for i in range(k)]
+        fig, ax = plt.subplots(figsize=(12, 0.6 * k + 2.5))
+        dibujar_heatmap(ax, centros_z)
+        ax.set_title("Centroides en escala estandarizada", fontsize=11, fontweight="bold")
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+
+        rasgos = []
+        for i in range(k):
+            fila = centros_z.iloc[i]
+            altas = fila.nlargest(2)
+            bajas = fila.nsmallest(2)
+            rasgos.append(
+                f"- **Clúster {i}** ({int((labels == i).sum())} muestras): alto en "
+                + ", ".join(f"`{v}` ({z:+.2f})" for v, z in altas.items())
+                + "; bajo en " + ", ".join(f"`{v}` ({z:+.2f})" for v, z in bajas.items()) + "."
+            )
+        st.markdown("**Rasgos que distinguen a cada clúster:**\n" + "\n".join(rasgos))
+
+    # 4. Visualización
+    with tab_vis:
+        st.subheader("Clústeres en proyección 2D")
+        coords, var_exp, pca = proyeccion_2d(X)
+        centros_2d = pca.transform(centros)
+        fig, ax = plt.subplots(figsize=(8, 5.5))
+        for i, color in enumerate(colores_clusters(k)):
+            m = labels == i
+            ax.scatter(coords[m, 0], coords[m, 1], color=color, edgecolors="black", linewidth=0.4,
+                       alpha=0.8, s=45, label=f"Clúster {i} (n={m.sum()})")
+        ax.scatter(centros_2d[:, 0], centros_2d[:, 1], marker="X", s=250, color="black", label="Centroides")
+        ax.set_xlabel(f"PC1 ({var_exp[0]:.1%} varianza)")
+        ax.set_ylabel(f"PC2 ({var_exp[1]:.1%} varianza)")
+        ax.set_title(f"K-Means (K = {k}) proyectado en PC1-PC2", fontsize=11, fontweight="bold")
+        ax.grid(True, linestyle="--", alpha=0.4)
+        ax.legend(fontsize=8)
+        st.pyplot(fig)
+        plt.close(fig)
+        st.caption(
+            "La proyección PCA se usa solo para dibujar; K-Means se entrenó con todas las variables. "
+            "El análisis completo de PCA está en la sección **PCA**."
+        )
+        tabla_vs_etiqueta(labels, "Clúster K-Means")
 
 
 # ------------------------------------------------------------------- DBSCAN
 def pagina_dbscan():
     st.header("🔬 Agrupamiento DBSCAN")
-    X_final, X_raw, vars_x, scaler = obtener_datos_preprocesados()
+    X_final, X_raw, vars_x, scaler = matriz_para_clustering()
     if X_final is None:
         return
+    X = X_final.to_numpy()
+    n = X.shape[0]
 
-    st.success(f"✅ Conexión con Parte 2 exitosa: Matriz lista con {X_final.shape[0]} muestras y {X_final.shape[1]} variables ({st.session_state.get('scaler_nombre', 'StandardScaler')}).")
-    st.info("📌 **Espacio listo para la Parte 3:** Controles para eps y min_samples, cálculo del gráfico k-distance, conteo de clústeres válidos (sin -1) y porcentaje de ruido.")
+    st.markdown(
+        "DBSCAN agrupa por densidad con distancia **euclídea**: un punto es núcleo si tiene al menos "
+        "`min_samples` puntos (incluido él mismo) a distancia ≤ `eps`. Los puntos no alcanzables "
+        "desde un núcleo se marcan como **ruido (-1)**."
+    )
+
+    c_eps, c_ms = st.columns(2)
+    eps = c_eps.slider("eps (radio de vecindad)", 0.10, 6.00, EPS_DEFECTO, 0.05, key="eps_dbscan",
+                       help="Cada cambio vuelve a ejecutar DBSCAN.")
+    min_samples = c_ms.slider("min_samples", 2, min(20, n), min(MIN_SAMPLES_DEFECTO, n), key="ms_dbscan")
+
+    labels = ajustar_dbscan(X, eps, min_samples)
+    n_ruido = int((labels == -1).sum())
+    n_clusters = len(set(labels)) - (1 if n_ruido else 0)
+    met, motivo = metricas_internas(X, labels)
+
+    st.session_state["labels_dbscan"] = labels
+    st.session_state["dbscan_params"] = {"eps": eps, "min_samples": min_samples, "metric": "euclidean"}
+    st.session_state["dbscan_metricas"] = {
+        "N.º clústeres": n_clusters, "N.º ruido": n_ruido, "% ruido": 100 * n_ruido / n, **(met or {}),
+    }
+
+    tab_kd, tab_mod, tab_sens, tab_vis = st.tabs([
+        "1. Gráfico k-distance", "2. Modelo y métricas", "3. Sensibilidad", "4. Visualización y perfil",
+    ])
+
+    # 1. k-distance
+    with tab_kd:
+        st.subheader("Gráfico k-distance para elegir eps")
+        kdist = distancias_k(X, min_samples)
+        pct_nucleo = 100 * (kdist <= eps).mean()
+        fig, ax = plt.subplots(figsize=(9, 4.5))
+        ax.plot(np.arange(1, n + 1), kdist, color="#722f37", linewidth=2)
+        ax.axhline(eps, color="red", linestyle="--", label=f"eps actual = {eps:.2f}")
+        ax.set_xlabel("Puntos ordenados por distancia")
+        ax.set_ylabel(f"Distancia al {min_samples - 1}.º vecino más cercano")
+        ax.set_title(f"k-distance (min_samples = {min_samples})", fontsize=11, fontweight="bold")
+        ax.grid(True, linestyle="--", alpha=0.4)
+        ax.legend()
+        st.pyplot(fig)
+        plt.close(fig)
+        p50, p75, p90 = np.percentile(kdist, [50, 75, 90])
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Percentil 50", f"{p50:.2f}")
+        c2.metric("Percentil 75", f"{p75:.2f}")
+        c3.metric("Percentil 90", f"{p90:.2f}")
+        c4.metric("Puntos núcleo con este eps", f"{pct_nucleo:.1f} %")
+        st.caption(
+            "El eps adecuado suele ubicarse donde la curva empieza a subir con fuerza (codo). "
+            "Los puntos por encima de la línea roja no son núcleo: serán borde o ruido."
+        )
+
+    # 2. Modelo
+    with tab_mod:
+        st.subheader(f"Resultado con eps = {eps:.2f} y min_samples = {min_samples}")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("N.º clústeres (sin -1)", n_clusters)
+        c2.metric("N.º puntos de ruido", n_ruido)
+        c3.metric("% ruido", f"{100 * n_ruido / n:.1f} %")
+        c4.metric("Cobertura", f"{100 * (n - n_ruido) / n:.1f} %")
+
+        c5, c6, c7 = st.columns(3)
+        c5.metric("Silhouette (sin ruido)", f"{met['Silhouette']:.3f}" if met else "No calculable")
+        c6.metric("Davies-Bouldin (sin ruido)", f"{met['Davies-Bouldin']:.3f}" if met else "No calculable")
+        c7.metric("Calinski-Harabasz (sin ruido)", f"{met['Calinski-Harabasz']:.1f}" if met else "No calculable")
+        st.caption("Las métricas se calculan solo sobre los puntos asignados a un clúster (se excluye -1).")
+
+        if n_clusters == 0:
+            st.warning("Todos los puntos quedaron como ruido: eps es demasiado pequeño o min_samples demasiado alto.")
+        elif n_clusters == 1:
+            st.warning("Solo se formó un clúster: eps es demasiado grande para separar regiones densas; "
+                       f"métricas no calculables ({motivo}).")
+        elif motivo:
+            st.warning(f"Métricas no calculables: {motivo}.")
+        if 100 * n_ruido / n > 30:
+            st.info("Más del 30 % de los puntos es ruido: conviene aumentar eps o reducir min_samples.")
+
+        tamanos = pd.Series(labels).value_counts().sort_index()
+        tam_df = pd.DataFrame({
+            "Grupo": ["Ruido (-1)" if g == -1 else f"Clúster {g}" for g in tamanos.index],
+            "Tamaño": tamanos.values,
+            "%": (100 * tamanos.values / n).round(1),
+        })
+        st.dataframe(tam_df, hide_index=True, width="stretch")
+
+    # 3. Sensibilidad
+    with tab_sens:
+        st.subheader("Sensibilidad a eps y min_samples")
+        sens = sensibilidad_dbscan(X, tuple(GRILLA_EPS), tuple(GRILLA_MIN_SAMPLES))
+        col_a, col_b = st.columns(2)
+        for col, valor, titulo, cmap, fmt in [
+            (col_a, "N.º clústeres", "N.º de clústeres (sin -1)", "Blues", "d"),
+            (col_b, "% ruido", "% de ruido", "Reds", ".1f"),
+        ]:
+            pivote = sens.pivot(index="min_samples", columns="eps", values=valor)
+            fig, ax = plt.subplots(figsize=(6, 3.8))
+            dibujar_heatmap(ax, pivote, cmap=cmap, fmt=fmt, centro=None)
+            ax.set_title(titulo, fontsize=11, fontweight="bold")
+            plt.tight_layout()
+            col.pyplot(fig)
+            plt.close(fig)
+        st.dataframe(sens, hide_index=True, width="stretch")
+        st.caption(
+            "Pequeños cambios de eps alteran mucho el resultado: con eps bajo casi todo es ruido y con eps "
+            "alto todas las muestras se funden en un solo clúster."
+        )
+
+    # 4. Visualización
+    with tab_vis:
+        st.subheader("Puntos DBSCAN con ruido marcado (proyección 2D)")
+        coords, var_exp, _ = proyeccion_2d(X)
+        fig, ax = plt.subplots(figsize=(8, 5.5))
+        ruido = labels == -1
+        ax.scatter(coords[ruido, 0], coords[ruido, 1], marker="x", color=COLOR_RUIDO, s=45,
+                   label=f"Ruido -1 (n={ruido.sum()})")
+        for i, color in enumerate(colores_clusters(n_clusters)):
+            m = labels == i
+            ax.scatter(coords[m, 0], coords[m, 1], color=color, edgecolors="black", linewidth=0.4,
+                       alpha=0.85, s=45, label=f"Clúster {i} (n={m.sum()})")
+        ax.set_xlabel(f"PC1 ({var_exp[0]:.1%} varianza)")
+        ax.set_ylabel(f"PC2 ({var_exp[1]:.1%} varianza)")
+        ax.set_title(f"DBSCAN (eps = {eps:.2f}, min_samples = {min_samples})", fontsize=11, fontweight="bold")
+        ax.grid(True, linestyle="--", alpha=0.4)
+        ax.legend(fontsize=8)
+        st.pyplot(fig)
+        plt.close(fig)
+        st.caption("La proyección PCA se usa solo para dibujar; DBSCAN se ejecutó con todas las variables.")
+
+        st.markdown("**Media de cada grupo en unidades originales:**")
+        perfil = X_raw.groupby(labels).mean().round(2)
+        perfil.index = ["Ruido (-1)" if g == -1 else f"Clúster {g}" for g in perfil.index]
+        st.dataframe(perfil.T, width="stretch")
+        if n_ruido:
+            z_max_ruido = np.abs(X[ruido]).max(axis=1).mean()
+            z_max_resto = np.abs(X[~ruido]).max(axis=1).mean() if (~ruido).any() else float("nan")
+            st.caption(
+                f"Valor |z| máximo promedio: ruido {z_max_ruido:.2f} vs. resto {z_max_resto:.2f}. "
+                "Un valor mayor indica que el ruido reúne muestras con valores extremos en alguna variable."
+            )
+        tabla_vs_etiqueta(labels, "Clúster DBSCAN")
 
 
 # ------------------------------------------------------------------ Main
