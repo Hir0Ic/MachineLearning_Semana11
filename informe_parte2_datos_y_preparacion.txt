@@ -1,0 +1,303 @@
+================================================================================
+SISTEMAS INTELIGENTES Y MACHINE LEARNING · GRUPO 03 · UPN
+PROYECTO: DESCUBRIMIENTO DE PATRONES FISICOQUÍMICOS EN VINOS (K-MEANS, DBSCAN, PCA)
+DOCUMENTO DE APOYO PARA EL INFORME (WORD) - PARTE 2: DATOS Y PREPARACIÓN
+================================================================================
+
+CONTENIDO ESTRUCTURADO SEGÚN RÚBRICA:
+3.3 ANÁLISIS EXPLORATORIO DE DATOS (EDA)
+    3.3.1 Estructura, tipos de datos, nulos y duplicados
+    3.3.2 Tabla completa de estadísticos descriptivos multivariados
+    3.3.3 Análisis de heterogeneidad de escalas de medición
+    3.3.4 Análisis morfológico de distribuciones (Histogramas y KDE)
+          [+ Guía de inserción de Figura 1: Cuadrícula de Histogramas]
+    3.3.5 Detección sistemática de valores atípicos (Boxplots y Regla de Tukey)
+          [+ Guía de inserción de Figura 2: Diagramas de Caja]
+    3.3.6 Matriz y análisis de correlación lineal de Pearson
+          [+ Guía de inserción de Figura 3: Heatmap de Correlación]
+    3.3.7 Síntesis de hallazgos del EDA
+
+3.4 PREPROCESAMIENTO: DECISIONES COMPARADAS Y MATRIZ X FINAL
+    3.4.1 Aislamiento de la matriz X y principio del aprendizaje no supervisado
+    3.4.2 Formulación matemática y comparación teórica de decisiones
+    3.4.3 Tabla comparativa de impacto numérico del escalado
+          [+ Guía de inserción de Figura 4: Comparación de Boxplots de Escalado]
+    3.4.4 Justificación técnica de la elección de la matriz X final
+
+3.5 PARÁMETROS REPRODUCIBLES
+    3.5.1 Tabla formal de hiperparámetros y especificaciones
+    3.5.2 Script reproducible en Python (para anexo de código)
+
+================================================================================
+3.3 ANÁLISIS EXPLORATORIO DE DATOS (EDA)
+================================================================================
+
+3.3.1 Estructura, tipos de datos, nulos y duplicados
+--------------------------------------------------------------------------------
+- Fuente original: Wine Dataset - UCI Machine Learning Repository (Aeberhard & Forina, 1992).
+- Total de observaciones (filas): 178 muestras de vino procedentes de tres cultivares de Italia.
+- Total de variables predictoras: 13 atributos fisicoquímicos continuos.
+- Variable de clase externa: 'target' (3 clases: 0, 1 y 2). Se excluye de la matriz de agrupamiento.
+- Valores nulos o faltantes: 0 en todas las columnas (100% de integridad de datos).
+- Filas duplicadas: 0 registros duplicados.
+- Tipos de datos por columna:
+    * alcohol: float64 (Grado alcohólico en % vol)
+    * malic_acid: float64 (Ácido málico en g/L)
+    * ash: float64 (Cenizas residuales en g/L)
+    * alcalinity_of_ash: float64 (Alcalinidad de cenizas)
+    * magnesium: float64 (Magnesio en mg/L)
+    * total_phenols: float64 (Fenoles totales en g/L)
+    * flavanoids: float64 (Flavonoides en g/L)
+    * nonflavanoid_phenols: float64 (Fenoles no flavonoides en g/L)
+    * proanthocyanins: float64 (Proantocianidinas en g/L)
+    * color_intensity: float64 (Intensidad del color)
+    * hue: float64 (Matiz o tonalidad del color)
+    * od280/od315_of_diluted_wines: float64 (Absorbancia espectral 280/315 nm)
+    * proline: float64 (Aminoácido prolina en mg/L)
+
+
+3.3.2 Tabla completa de estadísticos descriptivos multivariados (N = 178)
+--------------------------------------------------------------------------------
+Variable                      Media     Std     Mín     Q1(25%) Mediana Q3(75%) Máx      Rango    IQR     Asimetría (Skew)
+------------------------------------------------------------------------------------------------------------------------
+alcohol                       13.001   0.812   11.030   12.362  13.050  13.678   14.830    3.800   1.315   -0.051 (Aprox. simétrica)
+malic_acid                     2.336   1.117    0.740    1.602   1.865   3.082    5.800    5.060   1.480   +1.040 (Sesgo a la derecha)
+ash                            2.367   0.274    1.360    2.210   2.360   2.558    3.230    1.870   0.348   -0.177 (Aprox. simétrica)
+alcalinity_of_ash             19.495   3.340   10.600   17.200  19.500  21.500   30.000   19.400   4.300   +0.213 (Aprox. simétrica)
+magnesium                     99.742  14.282   70.000   88.000  98.000 107.000  162.000   92.000  19.000   +1.098 (Sesgo a la derecha)
+total_phenols                  2.295   0.626    0.980    1.742   2.355   2.800    3.880    2.900   1.057   +0.087 (Aprox. simétrica)
+flavanoids                     2.029   0.999    0.340    1.205   2.135   2.875    5.080    4.740   1.670   +0.025 (Aprox. simétrica)
+nonflavanoid_phenols           0.362   0.124    0.130    0.270   0.340   0.438    0.660    0.530   0.167   +0.450 (Sesgo moderado)
+proanthocyanins                1.591   0.572    0.410    1.250   1.555   1.950    3.580    3.170   0.700   +0.517 (Sesgo moderado)
+color_intensity                5.058   2.318    1.280    3.220   4.690   6.200   13.000   11.720   2.980   +0.869 (Sesgo moderado-alto)
+hue                            0.957   0.229    0.480    0.782   0.965   1.120    1.710    1.230   0.338   +0.021 (Aprox. simétrica)
+od280/od315_of_diluted_wines   2.612   0.710    1.270    1.938   2.780   3.170    4.000    2.730   1.232   -0.307 (Aprox. simétrica)
+proline                      746.893 314.907  278.000  500.500 673.500 985.000 1680.000 1402.000 484.500   +0.768 (Sesgo a la derecha)
+
+
+3.3.3 Análisis de heterogeneidad de escalas de medición
+--------------------------------------------------------------------------------
+Las magnitudes de las variables químicas presentan diferencias de hasta cuatro órdenes de magnitud:
+- 'proline' oscila entre 278.0 y 1680.0 mg/L (media = 746.89, rango = 1402.0).
+- 'magnesium' oscila entre 70.0 y 162.0 mg/L (media = 99.74, rango = 92.0).
+- 'nonflavanoid_phenols' oscila entre 0.13 y 0.66 g/L (media = 0.36, rango = 0.53).
+
+Impacto técnico: Si las variables se introducen sin transformar, los algoritmos basados en distancias
+euclídeas (K-Means, DBSCAN y PCA) se verán sesgados y dominados casi al 100% por 'proline' y 'magnesium',
+dejando sin peso analítico a los flavonoides y polifenoles. Esto exige una estandarización obligatoria.
+
+
+3.3.4 Análisis morfológico de distribuciones (Histogramas y KDE)
+--------------------------------------------------------------------------------
+Al inspeccionar las curvas de densidad kernel (KDE) y los histogramas de frecuencia, se identifican
+tres patrones morfológicos principales:
+
+1. Distribuciones aproximadamente simétricas / unimodales:
+   - 'alcohol', 'ash', 'alcalinity_of_ash' y 'hue' presentan forma acampanada con asimetría cercana a cero (|skew| < 0.25).
+2. Distribuciones bimodales / multimodales:
+   - 'flavanoids', 'total_phenols' y 'od280/od315_of_diluted_wines' exhiben dos cúspides claras en sus densidades.
+     Esto evidencia una separación natural de los vinos en grupos con alta y baja concentración fenólica,
+     lo cual respalda fuertemente la viabilidad del agrupamiento (clustering).
+3. Distribuciones asimétricas a la derecha (sesgo positivo):
+   - 'malic_acid' (skew = +1.04), 'magnesium' (skew = +1.10) y 'color_intensity' (skew = +0.87) presentan
+     colas largas hacia valores elevados generadas por muestras atípicas de vendimias concentradas.
+
+>> [PEGAR EN WORD AQUÍ: CAPTURA DE PANTALLA DE LA APLICACIÓN STREAMLIT]
+>> Figura 1. Cuadrícula de histogramas y curvas de densidad KDE de las 13 variables fisicoquímicas
+   (Ruta en la app: Sección "EDA" -> Pestaña "3. Distribuciones" -> Opción "Ver todas en cuadrícula").
+
+
+3.3.5 Detección sistemática de valores atípicos (Boxplots y Regla de Tukey)
+--------------------------------------------------------------------------------
+Se aplicó la regla de Tukey evaluando los límites [Q1 - 1.5*IQR, Q3 + 1.5*IQR]:
+
+Variable                      Límite Inferior   Límite Superior   Cant. Outliers   Porcentaje (%)
+-------------------------------------------------------------------------------------------------
+magnesium                              59.500           135.500                4            2.25%
+alcalinity_of_ash                      10.750            27.950                4            2.25%
+color_intensity                        -1.250            10.670                4            2.25%
+malic_acid                             -0.617             5.302                3            1.69%
+ash                                     1.689             3.079                3            1.69%
+proanthocyanins                         0.200             3.000                2            1.12%
+hue                                     0.276             1.626                1            0.56%
+alcohol                                10.390            15.650                0            0.00%
+total_phenols                           0.156             4.386                0            0.00%
+flavanoids                             -1.300             5.380                0            0.00%
+nonflavanoid_phenols                    0.019             0.689                0            0.00%
+od280/od315_of_diluted_wines            0.089             5.019                0            0.00%
+proline                              -226.250          1711.750                0            0.00%
+-------------------------------------------------------------------------------------------------
+TOTAL VARIABLES CON OUTLIERS: 7 de 13 variables.
+
+Interpretación para el informe:
+Los outliers identificados representan proporciones bajas (< 2.25% del total). Pertenecen a vinos con perfiles
+enológicos especiales (por ejemplo, vinos de gran extracción tánica o acidez elevada). Se conservan íntegramente
+en el dataset para preservar la riqueza de información, empleando StandardScaler como opción estándar y
+manteniendo RobustScaler como prueba de robustez.
+
+>> [PEGAR EN WORD AQUÍ: CAPTURA DE PANTALLA DE LA APLICACIÓN STREAMLIT]
+>> Figura 2. Diagrama de caja (Boxplot) de variables con outliers destacados como 'magnesium' o 'malic_acid'
+   (Ruta en la app: Sección "EDA" -> Pestaña "4. Outliers").
+
+
+3.3.6 Matriz y análisis de correlación lineal de Pearson
+--------------------------------------------------------------------------------
+Los pares de variables con mayor asociación lineal (|r| > 0.50) son:
+
+1. total_phenols y flavanoids (r = +0.865) -> Correlación positiva muy fuerte
+   Interpretación: Los flavonoides son el componente cuantitativamente preponderante dentro de los fenoles totales.
+2. flavanoids y od280/od315_of_diluted_wines (r = +0.787) -> Correlación positiva fuerte
+   Interpretación: La prueba espectrofotométrica a 280/315 nm cuantifica la absorción de luz por parte de los flavonoides.
+3. total_phenols y od280/od315_of_diluted_wines (r = +0.700) -> Correlación positiva fuerte
+   Interpretación: Consistencia analítica en la detección óptica de polifenoles.
+4. flavanoids y proanthocyanins (r = +0.653) -> Correlación positiva moderada-fuerte
+   Interpretación: Las proantocianidinas corresponden a taninos condensados sintetizados a partir de flavonoides.
+5. alcohol y proline (r = +0.644) -> Correlación positiva moderada
+   Interpretación: Correlación agronómica; la maduración alcohólica y la síntesis de prolina ocurren en paralelo en la vid.
+6. total_phenols y proanthocyanins (r = +0.612) -> Correlación positiva moderada
+7. hue y od280/od315_of_diluted_wines (r = +0.565) -> Correlación positiva moderada
+8. malic_acid y hue (r = -0.561) -> Correlación negativa moderada
+   Interpretación: Vinos con exceso de ácido málico exhiben matices más ácidos y menos evolucionados.
+9. alcohol y color_intensity (r = +0.546) -> Correlación positiva moderada
+10. flavanoids y hue (r = +0.543) -> Correlación positiva moderada
+
+>> [PEGAR EN WORD AQUÍ: CAPTURA DE PANTALLA DE LA APLICACIÓN STREAMLIT O ARCHIVO DE IMAGEN]
+>> Figura 3a. Matriz de correlación lineal de Pearson con mapa de calor (Heatmap)
+   (Ruta en la app: Sección "EDA" -> Pestaña "5. Matriz de Correlación").
+   (Archivo generado en: imagenes_informe/figura_3_matriz_correlacion.png)
+
+>> [PEGAR EN WORD AQUÍ: CAPTURA O ARCHIVO DE IMAGEN]
+>> Figura 3b. Diagramas de dispersión bivariada: total_phenols vs. flavanoids y alcohol vs. proline
+   (Ruta en la app: Sección "EDA" -> Pestaña "5. Matriz de Correlación" -> Gráficos de dispersión).
+   (Archivo generado en: imagenes_informe/figura_5_dispersion_fenoles_y_prolina.png)
+   Pie de figura:
+   Figura 3b. Diagramas de dispersión bivariada con rectas de tendencia lineal ajustadas por mínimos cuadrados.
+   A la izquierda se observa la correlación lineal fuertemente positiva entre fenoles totales y flavonoides (r = +0.865);
+   a la derecha se aprecia la asociación lineal positiva moderada entre graduación alcohólica y prolina (r = +0.644).
+
+
+3.3.7 Síntesis de hallazgos del EDA
+--------------------------------------------------------------------------------
+1. Calidad: Integridad total (178 filas, 0 nulos, 0 duplicados).
+2. Escala: Severa heterogeneidad que justifica y hace mandatorio el escalado.
+3. Bimodalidad: La presencia de distribuciones bimodales en flavonoides confirma la presencia de clústeres naturales.
+4. Redundancia: Altas correlaciones en polifenoles que validan el uso de PCA para reducción de dimensionalidad.
+
+
+================================================================================
+3.4 PREPROCESAMIENTO: DECISIONES COMPARADAS Y MATRIZ X FINAL
+================================================================================
+
+3.4.1 Aislamiento de la matriz X y principio del aprendizaje no supervisado
+--------------------------------------------------------------------------------
+Para garantizar un proceso de agrupamiento genuino y no supervisado, la columna externa 'target'
+fue excluida por completo. La matriz resultante X comprende 178 filas y 13 columnas cuantitativas.
+
+
+3.4.2 Formulación matemática y comparación teórica de decisiones
+--------------------------------------------------------------------------------
+Se compararon dos estrategias metodológicas de preparación de características:
+
+* Decisión A: StandardScaler (Z-Score)
+  Fórmula matemática: z = (x - mu) / sigma
+  Centra en media = 0 y escala a desviación estándar = 1.
+  Idoneidad: Es la formulación óptima para K-Means y PCA, ya que ambos algoritmos asumen esfericidad
+  e igualdad de varianzas en las dimensiones del espacio euclídeo.
+
+* Decisión B: RobustScaler (Centrado en Mediana y rango intercuartílico)
+  Fórmula matemática: z = (x - Mediana) / IQR, donde IQR = Q3 - Q1
+  Centra en mediana = 0 y escala en unidades IQR = 1.
+  Idoneidad: Reduce la influencia de outliers, pero produce varianzas heterogéneas entre variables,
+  lo que debilita el cálculo de autovalores en PCA.
+
+
+3.4.3 Tabla comparativa de impacto numérico del escalado
+--------------------------------------------------------------------------------
+Variable        Métrica           Datos Originales       Decisión A (StandardScaler)   Decisión B (RobustScaler)
+---------------------------------------------------------------------------------------------------------------
+alcohol         Media             13.00                  0.00                          -0.06
+                Desv. Estándar     0.81                  1.00                           0.62
+                Mediana           13.05                  0.06                           0.00
+                IQR                1.31                  1.62                           1.00
+                Rango [Mín, Máx]  [11.03, 14.83]         [-2.43, +2.26]                [-1.54, +1.35]
+
+magnesium       Media             99.74                  0.00                           0.09
+(con outliers)  Desv. Estándar    14.28                  1.00                           0.75
+                Mediana           98.00                 -0.12                           0.00
+                IQR               19.00                  1.33                           1.00
+                Rango [Mín, Máx]  [70.00, 162.00]        [-2.09, +4.37]                [-1.47, +3.37]
+
+flavanoids      Media              2.03                  0.00                          -0.06
+                Desv. Estándar     1.00                  1.00                           0.60
+                Mediana            2.13                  0.11                           0.00
+                IQR                1.67                  1.67                           1.00
+                Rango [Mín, Máx]  [0.34, 5.08]           [-1.70, +3.06]                [-1.07, +1.76]
+
+proline         Media            746.89                  0.00                           0.15
+(gran escala)   Desv. Estándar   314.91                  1.00                           0.65
+                Mediana          673.50                 -0.23                           0.00
+                IQR              484.50                  1.54                           1.00
+                Rango [Mín, Máx]  [278.00, 1680.00]      [-1.49, +2.97]                [-0.82, +2.08]
+
+>> [PEGAR EN WORD AQUÍ: CAPTURA DE PANTALLA DE LA APLICACIÓN STREAMLIT]
+>> Figura 4. Comparativa de diagramas de caja horizontales: Datos Originales vs StandardScaler vs RobustScaler
+   (Ruta en la app: Sección "Preprocesamiento" -> Pestaña "Comparativa Visual de Distribución").
+
+
+3.4.4 Justificación técnica de la elección de la matriz X final
+--------------------------------------------------------------------------------
+Se adoptó definitivamente la Decisión A (StandardScaler) para conformar la matriz X final de (178, 13).
+Motivos:
+1. Permite que K-Means optimice centroides sin sesgo hacia ninguna dimensión.
+2. Garantiza que PCA calcule componentes principales basados en covarianza normalizada pura.
+3. La tasa de outliers encontrada en el EDA (< 2.5%) no causa distorsión crítica sobre la media muestral.
+
+
+================================================================================
+3.5 PARÁMETROS REPRODUCIBLES
+================================================================================
+
+3.5.1 Tabla formal de hiperparámetros y especificaciones
+--------------------------------------------------------------------------------
+Parámetro                             Valor / Configuración                  Justificación
+-----------------------------------------------------------------------------------------------------------------
+Semilla global (RANDOM_STATE)         42                                     Asegura reproducibilidad determinística.
+Clase de preprocesamiento             sklearn.preprocessing.StandardScaler   Estandarización Z-score paramétrica.
+Configuración del transformador       with_mean=True, with_std=True          Centrado exacto en 0 y varianza unitaria.
+Dimensiones de entrada y salida       178 filas x 13 columnas                Mantiene todas las variables químicas.
+Tratamiento de etiqueta externa       target excluida antes de fit_transform Estricto enfoque de clustering no supervisado.
+Versión de Python y librerías         Python 3.12 / scikit-learn 1.9.0       Especificación del entorno computacional.
+
+
+3.5.2 Script reproducible en Python (Para anexo de código del informe)
+--------------------------------------------------------------------------------
+```python
+import numpy as np
+import pandas as pd
+from sklearn.datasets import load_wine
+from sklearn.preprocessing import StandardScaler
+
+# 1. Fijar semilla aleatoria para reproducibilidad
+RANDOM_STATE = 42
+np.random.seed(RANDOM_STATE)
+
+# 2. Carga del conjunto de datos original
+wine = load_wine(as_frame=True)
+df = wine.frame
+
+# 3. Aislamiento de la matriz de características X (sin etiqueta externa)
+features = [col for col in df.columns if col != "target"]
+X_raw = df[features].copy()
+
+# 4. Ajuste y transformación mediante StandardScaler
+scaler = StandardScaler(with_mean=True, with_std=True)
+X_scaled = pd.DataFrame(scaler.fit_transform(X_raw), columns=features)
+
+# Verificación de integridad de la matriz X preprocesada
+print(f"Dimensiones de X preprocesada: {X_scaled.shape}")
+print(f"Media global promedio: {X_scaled.mean().mean():.4f}")
+print(f"Varianza global promedio: {X_scaled.var().mean():.4f}")
+```
+================================================================================
+FIN DEL DOCUMENTO DE PARTE 2
+================================================================================
