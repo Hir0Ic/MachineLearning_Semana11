@@ -1040,6 +1040,286 @@ def pagina_dbscan():
             )
         tabla_vs_etiqueta(labels, "Clúster DBSCAN")
 
+# ------------------------------------------------------------------- PCA
+def pagina_pca():
+    st.header("📉 Análisis de Componentes Principales (PCA)")
+    X_final, X_raw, vars_x, scaler = matriz_para_clustering()
+    if X_final is None:
+        return
+    X = X_final.to_numpy()
+
+    st.markdown(
+        "El PCA transforma las 13 variables correlacionadas en componentes no correlacionados "
+        "ordenados por la varianza que explican. Se usa para evaluar la redundancia y visualizar "
+        "los clústeres en 2D."
+    )
+
+    # Ajustar PCA con todas las componentes para el Scree Plot
+    pca_full = PCA(random_state=RANDOM_STATE)
+    pca_full.fit(X)
+    varianza_exp = pca_full.explained_variance_ratio_
+    varianza_acum = np.cumsum(varianza_exp)
+
+    tab_var, tab_cargas, tab_biplot, tab_vis = st.tabs(["1. Varianza Explicada", "2. Cargas (Loadings)", "3. Biplot (Vectores)", "4. Visualización PC1-PC2"])
+
+    # 1. Varianza Explicada (Scree Plot)
+    with tab_var:
+        st.subheader("Scree Plot y Varianza Acumulada")
+        n_comp = st.slider("Número de componentes a mostrar en el gráfico", 2, 13, 10)
+        
+        fig, ax1 = plt.subplots(figsize=(9, 4.5))
+        ax1.bar(range(1, n_comp + 1), varianza_exp[:n_comp], alpha=0.7, color="#722f37", label="Varianza Individual")
+        ax1.set_xlabel("Componente Principal")
+        ax1.set_ylabel("Proporción de Varianza Explicada", color="#722f37")
+        ax1.tick_params(axis='y', labelcolor="#722f37")
+        ax1.set_xticks(range(1, n_comp + 1))
+        
+        ax2 = ax1.twinx()
+        ax2.plot(range(1, n_comp + 1), varianza_acum[:n_comp], marker="o", color="#003366", linewidth=2, label="Varianza Acumulada")
+        ax2.set_ylabel("Varianza Acumulada", color="#003366")
+        ax2.tick_params(axis='y', labelcolor="#003366")
+        ax2.axhline(0.80, color="gray", linestyle="--", alpha=0.5)
+        
+        fig.suptitle("Scree Plot: Varianza por Componente", fontweight="bold")
+        st.pyplot(fig)
+        plt.close(fig)
+
+        st.info(
+            f"**PC1** explica el **{varianza_exp[0]:.2%}** de la varianza total. "
+            f"**PC1 y PC2** juntos explican el **{varianza_acum[1]:.2%}**. "
+            f"Para retener al menos el 80% de la información se necesitan **{np.argmax(varianza_acum >= 0.80) + 1}** componentes."
+        )
+
+    # 2. Cargas (Loadings)
+    with tab_cargas:
+        st.subheader("Contribución de las variables a los componentes")
+        st.markdown("Las cargas (loadings) indican cuánto aporta cada variable original a cada componente. Valores altos en valor absoluto indican mayor influencia.")
+        
+        n_comp_cargas = st.slider("Componentes a visualizar", 2, 5, 2, key="slider_cargas")
+        cargas_df = pd.DataFrame(
+            pca_full.components_[:n_comp_cargas].T,
+            columns=[f"PC{i+1}" for i in range(n_comp_cargas)],
+            index=vars_x
+        )
+        
+        fig, ax = plt.subplots(figsize=(8, 5))
+        dibujar_heatmap(ax, cargas_df, cmap="vlag", fmt=".2f", centro=0)
+        ax.set_title("Cargas de las variables en los Componentes Principales", fontweight="bold")
+        st.pyplot(fig)
+        plt.close(fig)
+
+        st.markdown(
+            "**Interpretación:** Variables como `flavanoids`, `total_phenols` y `od280/od315` "
+            "tienen cargas altas en PC1, lo que sugiere que este componente separa los vinos "
+            "principalmente por su **perfil fenólico**."
+        )
+
+    # 3. Biplot (Vectores de Cargas + Muestras)
+    with tab_biplot:
+        st.subheader("Biplot de Componentes Principales (PC1 vs PC2)")
+        st.markdown(
+            "El **Biplot** proyecta simultáneamente las observaciones (muestras de vino) y las variables "
+            "originales como vectores direccionados. La longitud y dirección de cada vector indican su peso y correlación con PC1 y PC2."
+        )
+        scale_arrows = st.slider("Factor de escala para vectores de carga", 2.0, 7.0, 4.8, step=0.2, key="slider_biplot_scale")
+        
+        coords = pca_full.transform(X)[:, :2]
+        components = pca_full.components_[:2]
+        
+        fig, ax = plt.subplots(figsize=(8.5, 5.5))
+        ax.scatter(coords[:, 0], coords[:, 1], c="#bbbbbb", alpha=0.6, edgecolors="#777777", linewidths=0.5, s=40, label="Muestras de vino")
+        
+        for i, col in enumerate(vars_x):
+            x_arr = components[0, i] * scale_arrows
+            y_arr = components[1, i] * scale_arrows
+            ax.annotate("", xy=(x_arr, y_arr), xytext=(0, 0),
+                        arrowprops=dict(arrowstyle="->", color="#800020", lw=1.5, mutation_scale=12))
+            ax.text(x_arr * 1.05, y_arr * 1.05, col, fontsize=8, fontweight="bold", color="#1a1a1a",
+                    bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="#cccccc", alpha=0.8))
+                    
+        ax.axhline(0, color="gray", linestyle=":", linewidth=0.8)
+        ax.axvline(0, color="gray", linestyle=":", linewidth=0.8)
+        ax.set_xlabel(f"PC1 ({varianza_exp[0]:.1%} varianza)")
+        ax.set_ylabel(f"PC2 ({varianza_exp[1]:.1%} varianza)")
+        ax.set_title("Biplot: Muestras y Vectores de Variables Fisicoquímicas", fontweight="bold")
+        ax.grid(True, linestyle="--", alpha=0.35)
+        ax.legend(loc="upper left")
+        st.pyplot(fig)
+        plt.close(fig)
+        
+        st.caption("Interpretación: Variables como flavanoids y total_phenols apuntan hacia la derecha (PC1), mientras que color_intensity y alcohol apuntan hacia arriba (PC2).")
+
+    # 4. Visualización PC1-PC2
+    with tab_vis:
+        st.subheader("Proyección de los datos en PC1 vs PC2")
+        coords = pca_full.transform(X)[:, :2]
+        
+        # Verificar si hay clústeres en session_state
+        labels_km = st.session_state.get("labels_kmeans", None)
+        labels_db = st.session_state.get("labels_dbscan", None)
+        
+        color_por = st.radio("Colorear puntos por:", ["Ninguno", "K-Means", "DBSCAN"], horizontal=True)
+        
+        color_array = None
+        if color_por == "K-Means" and labels_km is not None:
+            color_array = labels_km
+        elif color_por == "DBSCAN" and labels_db is not None:
+            color_array = labels_db
+            # Reemplazar -1 por un color específico para ruido
+            color_array = np.where(color_array == -1, 99, color_array) 
+        elif color_por != "Ninguno":
+            st.warning(f"Primero debes ejecutar el modelo {color_por} en su sección correspondiente.")
+
+        fig, ax = plt.subplots(figsize=(8, 5.5))
+        if color_array is not None:
+            # Mapeo de colores
+            unique_labels = np.unique(color_array)
+            cmap = plt.get_cmap("tab10")
+            for lbl in unique_labels:
+                mask = color_array == lbl
+                color = "gray" if lbl == 99 else cmap(lbl % 10)
+                marker = "x" if lbl == 99 else "o"
+                label_name = "Ruido (-1)" if lbl == 99 else f"Clúster {lbl}"
+                ax.scatter(coords[mask, 0], coords[mask, 1], c=[color], marker=marker, 
+                           edgecolors="black" if lbl != 99 else None, linewidth=0.4,
+                           alpha=0.7, s=45, label=label_name)
+            ax.legend()
+        else:
+            ax.scatter(coords[:, 0], coords[:, 1], color="#722f37", edgecolors="black", linewidth=0.4, alpha=0.7, s=45)
+
+        ax.set_xlabel(f"PC1 ({varianza_exp[0]:.1%} varianza)")
+        ax.set_ylabel(f"PC2 ({varianza_exp[1]:.1%} varianza)")
+        ax.set_title("Muestras de vino proyectadas en el plano PC1-PC2", fontweight="bold")
+        ax.grid(True, linestyle="--", alpha=0.4)
+        st.pyplot(fig)
+        plt.close(fig)
+        
+        st.caption("Nota: PCA no agrupa, solo transforma el espacio. Si los puntos de un mismo clúster aparecen juntos, significa que las variables originales que los separan están bien representadas en estos dos componentes.")
+
+
+# -------------------------------------------------------------- Comparación
+def pagina_comparacion():
+    st.header("⚖️ Comparación Metodológica: K-Means vs. DBSCAN")
+    
+    labels_km = st.session_state.get("labels_kmeans", None)
+    labels_db = st.session_state.get("labels_dbscan", None)
+    
+    if labels_km is None or labels_db is None:
+        st.warning("⚠️ Debes ejecutar primero los modelos en las secciones **K-Means** y **DBSCAN** para poder compararlos.")
+        return
+        
+    X_final, X_raw, vars_x, scaler = matriz_para_clustering()
+    if X_final is None or X_raw is None:
+        return
+    X = X_final.to_numpy()
+    
+    # Calcular métricas K-Means
+    met_km, _ = metricas_internas(X, labels_km)
+    n_clusters_km = len(np.unique(labels_km))
+    
+    # Calcular métricas DBSCAN
+    met_db, motivo_db = metricas_internas(X, labels_db)
+    n_ruido_db = int((labels_db == -1).sum())
+    n_clusters_db = len(set(labels_db)) - (1 if n_ruido_db > 0 else 0)
+    cobertura_db = 100 * (len(labels_db) - n_ruido_db) / len(labels_db)
+    
+    st.markdown(
+        "Esta sección contrasta los resultados obtenidos por ambos algoritmos sobre la misma "
+        "matriz X estandarizada. **Importante:** Las métricas de DBSCAN se calculan excluyendo los puntos de ruido (-1)."
+    )
+    
+    # Tabla Comparativa
+    st.subheader("Tabla Comparativa de Métricas")
+    data = {
+        "Indicador": [
+            "N.º de grupos", 
+            "Proporción de ruido", 
+            "Cobertura de puntos", 
+            "Inertia", 
+            "Silhouette", 
+            "Davies-Bouldin", 
+            "Calinski-Harabasz"
+        ],
+        "K-Means": [
+            n_clusters_km,
+            "0% (No aplica)",
+            "100%",
+            f"{st.session_state['kmeans_metricas']['Inertia']:.1f}",
+            f"{met_km['Silhouette']:.3f}" if met_km else "No calculable",
+            f"{met_km['Davies-Bouldin']:.3f}" if met_km else "No calculable",
+            f"{met_km['Calinski-Harabasz']:.1f}" if met_km else "No calculable"
+        ],
+        "DBSCAN": [
+            n_clusters_db,
+            f"{100 * n_ruido_db / len(labels_db):.1f}% ({n_ruido_db} muestras)",
+            f"{cobertura_db:.1f}%",
+            "No aplica",
+            f"{met_db['Silhouette']:.3f}" if met_db else "No calculable",
+            f"{met_db['Davies-Bouldin']:.3f}" if met_db else "No calculable",
+            f"{met_db['Calinski-Harabasz']:.1f}" if met_db else "No calculable"
+        ]
+    }
+    st.table(pd.DataFrame(data))
+
+    # Visualización comparativa de Silhouette
+    st.subheader("Comparación Visual de la Calidad del Agrupamiento")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Distribución de Clústeres (K-Means)**")
+        tam_km = pd.Series(labels_km).value_counts().sort_index()
+        fig, ax = plt.subplots(figsize=(6, 3))
+        ax.bar(tam_km.index.astype(str), tam_km.values, color=colores_clusters(n_clusters_km), edgecolor="black")
+        ax.set_xlabel("Clúster")
+        ax.set_ylabel("N.º de muestras")
+        st.pyplot(fig)
+        plt.close(fig)
+        
+    with col2:
+        st.markdown("**Distribución de Clústeres (DBSCAN)**")
+        tam_db = pd.Series(labels_db).value_counts().sort_index()
+        labels_x = ["Ruido (-1)" if i == -1 else f"C{i}" for i in tam_db.index]
+        colors_db = ["gray" if i == -1 else colores_clusters(n_clusters_db)[i] for i in tam_db.index]
+        fig, ax = plt.subplots(figsize=(6, 3))
+        ax.bar(labels_x, tam_db.values, color=colors_db, edgecolor="black")
+        ax.set_xlabel("Grupo")
+        ax.set_ylabel("N.º de muestras")
+        st.pyplot(fig)
+        plt.close(fig)
+
+    # Análisis Crítico
+    st.subheader("Análisis Crítico y Conclusiones de la Comparación")
+    st.markdown(
+        f"""
+        * **Cobertura vs. Ruido:** K-Means asigna todas las 178 muestras a un grupo, asumiendo que todas pertenecen a un perfil definido. DBSCAN identificó un **{100 * n_ruido_db / len(labels_db):.1f}%** de ruido ({n_ruido_db} muestras), las cuales coinciden en gran medida con los valores atípicos detectados en el EDA. Para el laboratorio, estas muestras de ruido son candidatas a **revisión individual o análisis de calidad**.
+        * **Calidad de los Grupos (Silhouette):** DBSCAN obtiene una Silhouette ligeramente superior ({met_db['Silhouette']:.3f} vs {met_km['Silhouette']:.3f}), lo que indica que los grupos que *sí* encontró están muy bien definidos. Sin embargo, esta métrica se calcula excluyendo el 23.6% de los datos, por lo que no es directamente comparable con el 100% de K-Means.
+        * **Utilidad de Negocio:** K-Means es más útil para **segmentar todos los lotes** de vino en 3 perfiles comerciales (ya que todos caen en un grupo). DBSCAN es más útil como **herramienta de control de calidad** para detectar anomalías (ruido) y encontrar los dos perfiles más extremos (vinos muy fenólicos vs. vinos muy ácidos).
+        * **Sensibilidad:** K-Means (con K=3) es estable y converge rápido. DBSCAN es extremadamente sensible a `eps`; un cambio mínimo (de 2.3 a 2.5) fusiona todo en un solo clúster.
+        """
+    )
+    
+    # Descarga de etiquetas
+    st.subheader("📥 Exportación de Etiquetas Asignadas")
+    st.markdown(
+        "Descarga el conjunto de datos con los identificadores originales de muestra y las etiquetas "
+        "asignadas por **K-Means** y **DBSCAN** (los puntos marcados como `-1` corresponden al ruido detectado)."
+    )
+    
+    df_descarga = X_raw.copy()
+    df_descarga.insert(0, "ID_Muestra", range(1, len(df_descarga) + 1))
+    df_descarga["Cluster_KMeans"] = labels_km
+    df_descarga["Cluster_DBSCAN"] = labels_db
+    
+    st.dataframe(df_descarga.head(10), use_container_width=True)
+    
+    csv_datos = df_descarga.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="📥 Descargar asignación de clústeres (CSV)",
+        data=csv_datos,
+        file_name="vinos_agrupados_kmeans_dbscan.csv",
+        mime="text/csv",
+        help="Archivo CSV con 178 filas, variables fisicoquímicas y clústeres de K-Means y DBSCAN."
+    )
 
 # ------------------------------------------------------------------ Main
 PAGINAS = {
@@ -1049,6 +1329,8 @@ PAGINAS = {
     "Preprocesamiento": pagina_preprocesamiento,
     "K-Means": pagina_kmeans,
     "DBSCAN": pagina_dbscan,
+    "PCA": pagina_pca,             
+    "Comparación": pagina_comparacion, 
 }
 
 st.sidebar.title("🍷 Navegación")

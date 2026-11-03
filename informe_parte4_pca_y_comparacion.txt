@@ -1,0 +1,239 @@
+================================================================================
+SISTEMAS INTELIGENTES Y MACHINE LEARNING · GRUPO 03 · UPN
+PROYECTO: DESCUBRIMIENTO DE PATRONES FISICOQUÍMICOS EN VINOS (K-MEANS, DBSCAN, PCA)
+DOCUMENTO DE APOYO PARA EL INFORME (WORD) - PARTE 4: PCA Y COMPARACIÓN METODOLÓGICA
+RESPONSABLE: Marco Antonio Gamez Monzon (Persona 4 - N00324879)
+================================================================================
+
+CONTENIDO:
+4.3 ANÁLISIS DE COMPONENTES PRINCIPALES (PCA)
+    - Fundamento conceptual: reducción de dimensionalidad vs. agrupamiento
+    - Varianza explicada individual y acumulada (Tabla con las 13 componentes)
+    - Justificación analítica: ¿Bastan dos componentes principales?
+    - Figura 10: Scree plot y varianza acumulada      (imagenes_informe/figura_10_pca_scree_plot.png)
+    - Tabla de cargas (Loadings) en PC1 y PC2
+    - Figura 11: Biplot de PCA (vectores y muestras) (imagenes_informe/figura_11_pca_biplot_cargas.png)
+    - Figura 12: Dispersión PC1-PC2 por clústeres    (imagenes_informe/figura_12_pca_dispersion_clusters.png)
+4.4 MÉTRICAS Y COMPARACIÓN METODOLÓGICA
+    - Tabla 8: Comparación cuantitativa K-Means vs. DBSCAN
+    - Declaración de espacios («No aplica» / «No calculable»)
+    - Análisis crítico: cobertura vs. ruido, estabilidad, comparabilidad de métricas y utilidad de negocio
+APLICACIÓN STREAMLIT: NOVEDADES DE LA PARTE 4
+    - Pestaña PCA: Biplot interactivo con ajuste de escala vectorial
+    - Pestaña Comparación: Botón de descarga de tabla completa con asignación de clústeres
+CÓDIGO REPRODUCIBLE (ANEXO B)
+
+Cifras verificadas con scikit-learn 1.9.1 / Python 3.14 sobre load_wine + StandardScaler.
+
+================================================================================
+4.3 ANÁLISIS DE COMPONENTES PRINCIPALES (PCA)
+================================================================================
+
+4.3.1 Fundamento y delimitación conceptual
+El Análisis de Componentes Principales (PCA) se aplicó sobre la matriz X estandarizada
+(178 observaciones × 13 variables fisicoquímicas). Es imprescindible establecer la
+distinción metodológica fundamental: PCA NO es una técnica de agrupamiento ni descubre
+segmentos por sí misma. PCA es una transformación lineal ortogonal no supervisada que
+proyecta los datos hacia un nuevo sistema de ejes (componentes principales) no
+correlacionados, ordenados de forma decreciente según la varianza explicada.
+
+En este estudio, PCA cumple dos funciones esenciales:
+1. Diagnosticar la redundancia informacional provocada por las fuertes correlaciones
+   lineales identificadas en el EDA (e.g., bloque fenólico flavanoids - total_phenols r = +0.865).
+2. Facilitar la visualización e interpretación bidimensional de los clústeres hallados
+   por K-Means y DBSCAN (los cuales se ajustaron en el espacio original de 13 dimensiones).
+
+Tabla 7B. Varianza explicada individual y acumulada por componente principal
+--------------------------------------------------------------------------------
+ Componente   Autovalor (Var)   Varianza individual (%)   Varianza acumulada (%)
+    PC1            4.706                36.20 %                   36.20 %
+    PC2            2.497                19.21 %                   55.41 %
+    PC3            1.446                11.12 %                   66.53 %
+    PC4            0.919                 7.07 %                   73.60 %
+    PC5            0.853                 6.56 %                   80.16 %  <-- Umbral 80%
+    PC6            0.642                 4.94 %                   85.10 %
+    PC7            0.551                 4.24 %                   89.34 %
+    PC8            0.348                 2.68 %                   92.02 %
+    PC9            0.289                 2.22 %                   94.24 %
+    PC10           0.251                 1.93 %                   96.17 %
+    PC11           0.226                 1.74 %                   97.91 %
+    PC12           0.169                 1.30 %                   99.20 %
+    PC13           0.104                 0.80 %                  100.00 %
+--------------------------------------------------------------------------------
+
+¿Bastan dos componentes principales para la interpretación?
+Respuesta analítica: Depende del objetivo analítico:
+- Para retención estricta de varianza: NO bastan. PC1 y PC2 capturan conjuntamente el
+  55.41 % de la varianza total (36.20 % y 19.21 % respectivamente), lo que implica una
+  pérdida del 44.59 % de la información original. Para superar el estándar habitual del 80 %
+  de varianza retenida se requieren 5 componentes principales (80.16 %).
+- Para visualización e interpretación enológica: SÍ son altamente útiles y suficientes.
+  A pesar de la pérdida geométrica, las dos primeras componentes sintetizan los dos ejes
+  químicos de mayor dispersión (el bloque fenólico en PC1 y la fuerza alcohólica/colorimétrica
+  en PC2), permitiendo representar visualmente con gran nitidez la frontera entre los
+  grupos descubiertos por los algoritmos de clustering.
+
+>> Figura 10. Scree Plot y curva de varianza explicada acumulada (PCA)
+Archivo: imagenes_informe/figura_10_pca_scree_plot.png
+Interpretación: El Scree Plot muestra una pendiente pronunciada entre la primera y la tercera
+componente. El autovalor de PC1 (4.71) y PC2 (2.50) superan ampliamente el criterio de Kaiser
+(autovalor > 1), al igual que PC3 (1.45). A partir de PC4, cada componente individual aporta
+menos del 7.1 % de la varianza. El umbral del 80 % se alcanza en PC5 (80.16 %). Esta estructura
+confirma cuantitativamente la hipótesis formulada en el EDA: la alta multicolinealidad entre
+los fenoles y los indicadores de color reduce drásticamente la dimensionalidad efectiva real
+del espacio del vino.
+
+4.3.2 Cargas factoriales (Loadings) y Biplot
+Las cargas factoriales representan la correlación entre las 13 variables originales estandarizadas
+y las componentes principales. Su análisis revela el significado fisicoquímico de los nuevos ejes.
+
+Tabla 7C. Cargas factoriales (Loadings) en PC1 y PC2
+--------------------------------------------------------------------------------
+ Variable original                     Carga PC1       Carga PC2    Dirección predominante
+ flavanoids                             +0.4229         -0.0034     Fenoles / Calidad antioxidante (+)
+ total_phenols                          +0.3947         +0.0650     Fenoles totales (+)
+ od280/od315_of_diluted_wines           +0.3762         -0.1645     Dilución y absorbancia fenólica (+)
+ proanthocyanins                        +0.3134         +0.0393     Taninos condensados (+)
+ hue                                    +0.2967         -0.2792     Tonalidad / Frescura (+)
+ proline                                +0.2868         +0.3649     Madurez y estructura (+)
+ alcohol                                +0.1443         +0.4837     Graduación alcohólica (+)
+ magnesium                              +0.1420         +0.2996     Mineralidad (+)
+ ash                                    -0.0021         +0.3161     Cenizas neutras
+ color_intensity                        -0.0886         +0.5300     Intensidad cromática (+)
+ alcalinity_of_ash                      -0.2393         -0.0106     Alcalinidad mineral (-)
+ malic_acid                             -0.2452         +0.2249     Acidez málica (-)
+ nonflavanoid_phenols                   -0.2985         +0.0288     Fenoles simples astringentes (-)
+--------------------------------------------------------------------------------
+
+Interpretación de los ejes:
+- Eje PC1 (Eje Fenólico / Envejecimiento noble): Dominado positivamente por flavanoids (+0.423),
+  total_phenols (+0.395) y od280/od315 (+0.376), y negativamente por nonflavanoid_phenols (-0.299)
+  y malic_acid (-0.245). Muestras hacia la derecha corresponden a vinos de elevada madurez fenólica,
+  cuerpo estructurado y alta capacidad antioxidante; hacia la izquierda, vinos con acidez málica
+  punzante y deficiencia fenólica.
+- Eje PC2 (Eje Cromático / Grado Alcohólico): Dominado positivamente por color_intensity (+0.530),
+  alcohol (+0.484) y proline (+0.365), y negativamente por hue (-0.279). Muestras hacia la parte
+  superior corresponden a vinos de alta intensidad colorimétrica, grado alcohólico y extracto seco.
+
+>> Figura 11. Biplot de PCA (PC1 vs. PC2): Muestras y vectores de variables
+Archivo: imagenes_informe/figura_11_pca_biplot_cargas.png
+Interpretación: El biplot ilustra cómo los vectores de variables se proyectan en dos direcciones
+ortogonales muy claras. El haz de vectores de flavanoids, total_phenols, proanthocyanins y od280/od315
+apunta casi paralelamente al semieje positivo de PC1 con ángulos agudos entre sí, confirmando su
+alta correlación mutua. En sentido ortogonal (hacia el semieje positivo de PC2), emergen de forma
+alineada color_intensity, alcohol y proline. Las muestras situadas en el cuadrante superior derecho
+combinan ambas propiedades (máxima concentración), mientras que las del cuadrante izquierdo carecen
+de fenoles y exhiben mayor acidez málica.
+
+>> Figura 12. Comparación de agrupamientos en el plano factorial PC1 vs. PC2
+Archivo: imagenes_informe/figura_12_pca_dispersion_clusters.png
+Interpretación: La proyección evidencia el comportamiento contrastante de ambos algoritmos:
+- En (a) K-Means (K = 3): La partición espacial es balanceada y convexa. El Clúster 1 (n=49)
+  se ubica en el semieje izquierdo de PC1 (baja concentración fenólica). El Clúster 2 (n=62)
+  se sitúa en el cuadrante superior derecho (alta prolina, alto alcohol y fenoles). El Clúster 0
+  (n=67) ocupa la franja intermedia inferior (vinos de color suave y graduación moderada).
+- En (b) DBSCAN (eps = 2.3, min_samples = 5): Reconoce el Clúster 1 aislado (n=42, coincidente
+  con el Clúster 1 de K-Means) pero fusiona en el Clúster 0 (n=94) a los vinos intermedios y de
+  alta prolina debido a que la densidad espacial entre ellos no presenta un valle vacío. Identifica
+  42 muestras de ruido (-1, marcadas con 'x' gris), las cuales se distribuyen en la periferia
+  exterior de la nube de datos y capturan las muestras con atípicos multivariados.
+
+
+================================================================================
+4.4 MÉTRICAS Y COMPARACIÓN METODOLÓGICA
+================================================================================
+
+Tabla 8. Comparación metodológica exhaustiva: K-Means vs. DBSCAN
+--------------------------------------------------------------------------------
+ Indicador                 K-Means (K = 3)            DBSCAN (eps = 2.3, min_samples = 5)
+ N.º de grupos             3                          2 (excluyendo el ruido -1)
+ Proporción de ruido       0.0 % (No aplica)          23.6 % (42 muestras marcadas con -1)
+ Cobertura de muestras     100.0 % (178/178)          76.4 % (136/178)
+ Inertia                   1277.9                     No aplica (no se basa en centroides)
+ Silhouette (↑)            0.285                      0.331 (calculado sobre los 136 puntos core/border)
+ Davies-Bouldin (↓)        1.389                      1.182 (calculado sobre los 136 puntos core/border)
+ Calinski-Harabasz (↑)     70.9                       70.5 (calculado sobre los 136 puntos core/border)
+ Espacio de ajuste         X estandarizada (13 vars)  X estandarizada (13 vars)
+ Hipótesis geométrica      Grupos globulares convexos Regiones de alta densidad conectada
+ Sensibilidad paramétrica  Estable (con n_init=10)    Alta sensibilidad a variaciones de eps
+--------------------------------------------------------------------------------
+
+4.4.1 Justificación de «No aplica» y condiciones de no comparabilidad
+1. Inertia en DBSCAN: Se consigna como «No aplica». La inercia cuantifica la suma de distancias
+   cuadráticas a centroides geométricos ($WSS$). DBSCAN no calcula centroides ni minimiza
+   varianza intra-clúster, por lo que la inercia carece de validez matemática para evaluar densidad.
+2. Proporción de ruido en K-Means: Se consigna como «No aplica». K-Means es un algoritmo de
+   partición exhaustiva forzada: asigna estrictamente el 100 % de los puntos a su centroide más
+   cercano, sin mecanismo nativo de abstención para valores atípicos.
+3. Métricas de validación interna (Silhouette, DB, CH) en DBSCAN:
+   Dichas métricas solo son calculables excluyendo las 42 muestras de ruido (-1). Cuando se calculan,
+   DBSCAN arroja un Silhouette superior (0.331 frente a 0.285 de K-Means) y un Davies-Bouldin más bajo
+   (1.182 frente a 1.389). ADVERTENCIA METODOLÓGICA: Esta aparente superioridad cuantitativa NO
+   indica que DBSCAN sea objetivamente mejor, sino que evalúa una población podada donde se
+   eliminó artificialmente el 23.6 % de las muestras más difíciles y dispersas. Comparar estas
+   cifras sin declarar la diferencia de cobertura induciría a un error de sesgo de selección.
+
+4.4.2 Análisis crítico comparativo
+- Cobertura vs. Ruido:
+  K-Means garantiza una cobertura total (100 %), resultando idóneo para clasificar la totalidad del
+  inventario o producción enológica en tres perfiles definidos. No obstante, absorbe de forma acrítica
+  los valores atípicos, distorsionando levemente la posición de los centroides.
+  DBSCAN sacrifica cobertura (76.4 %) pero actúa como un filtro robusto: 13 de las 17 muestras que
+  poseían valores atípicos univariados según la regla de Tukey en el EDA fueron clasificadas como ruido.
+- Estabilidad y dimensionalidad:
+  K-Means con K = 3 es sumamente estable frente a inicializaciones aleatorias gracias al algoritmo
+  k-means++ y n_init = 10. DBSCAN sufre la maldición de la dimensionalidad en 13 dimensiones:
+  la distancia promedio entre puntos se homogeniza, volviendo al hiperparámetro eps hipersensible.
+  Un leve incremento (e.g. eps = 2.5) reduce los clústeres a 1 (conglomerado masivo), mientras que una
+  reducción a eps = 2.0 incrementa el ruido a más del 40 %.
+- Utilidad para el negocio del laboratorio:
+  1. Para catalogación y segmentación de portafolio: K-Means es superior porque suministra
+     3 perfiles claros (Vino de guarda rico en fenoles, Vino aromático/equilibrado, y Vino ácido ligero).
+  2. Para control de calidad e inocuidad: DBSCAN es superior porque aísla automáticamente las
+     42 muestras atípicas (ruido), las cuales deben enviarse a contraanálisis cromatográfico o
+     revisión de defectos enológicos (oxidación, exceso de acidez volátil o acidez málica anormal).
+
+
+================================================================================
+CÓDIGO REPRODUCIBLE (ANEXO B)
+================================================================================
+```python
+import numpy as np
+import pandas as pd
+from sklearn.datasets import load_wine
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans, DBSCAN
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+
+# 1. Carga y preprocesamiento
+data = load_wine(as_frame=True)
+X_raw = data.frame.drop(columns=['target'])
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X_raw)
+
+# 2. PCA
+pca = PCA(random_state=42)
+coords = pca.fit_transform(X_scaled)
+var_exp = pca.explained_variance_ratio_
+var_acum = np.cumsum(var_exp)
+
+print("Varianza PC1:", var_exp[0], "Varianza PC2:", var_exp[1], "Acumulado:", var_acum[1])
+
+# 3. Modelos de agrupamiento en espacio original (13 variables)
+km = KMeans(n_clusters=3, n_init=10, random_state=42).fit(X_scaled)
+db = DBSCAN(eps=2.3, min_samples=5).fit(X_scaled)
+
+# 4. Métricas comparativas
+mask_validos = db.labels_ != -1
+sil_km = silhouette_score(X_scaled, km.labels_)
+sil_db = silhouette_score(X_scaled[mask_validos], db.labels_[mask_validos])
+db_km = davies_bouldin_score(X_scaled, km.labels_)
+db_db = davies_bouldin_score(X_scaled[mask_validos], db.labels_[mask_validos])
+ch_km = calinski_harabasz_score(X_scaled, km.labels_)
+ch_db = calinski_harabasz_score(X_scaled[mask_validos], db.labels_[mask_validos])
+
+print(f"K-Means: Sil={sil_km:.3f}, DB={db_km:.3f}, CH={ch_km:.1f}, Inertia={km.inertia_:.1f}")
+print(f"DBSCAN (sin ruido): Sil={sil_db:.3f}, DB={db_db:.3f}, CH={ch_db:.1f}")
+```
+
