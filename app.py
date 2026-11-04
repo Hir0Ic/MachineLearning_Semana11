@@ -18,6 +18,124 @@ except ImportError:
 
 st.set_page_config(page_title="Agrupamiento de vinos", page_icon="🍷", layout="wide")
 
+def aplicar_estilos_ui():
+    """Aplica diseño moderno, enológico y de alta gama a la interfaz Streamlit."""
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        html, body, [class*="css"] {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        h1, h2, h3 {
+            font-weight: 700 !important;
+            letter-spacing: -0.02em !important;
+        }
+        
+        h1 {
+            color: #722f37 !important;
+        }
+
+        /* Tarjetas de métricas modernas (KPIs) */
+        [data-testid="stMetric"] {
+            background: rgba(114, 47, 55, 0.035);
+            border: 1px solid rgba(114, 47, 55, 0.12);
+            border-radius: 12px;
+            padding: 14px 18px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 12px rgba(0, 0, 0, 0.03);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        [data-testid="stMetric"]:hover {
+            border-color: rgba(114, 47, 55, 0.28);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(114, 47, 55, 0.08);
+        }
+
+        [data-testid="stMetricLabel"] {
+            font-size: 0.82rem !important;
+            font-weight: 600 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        [data-testid="stMetricValue"] {
+            font-size: 1.65rem !important;
+            font-weight: 800 !important;
+            color: #722f37 !important;
+        }
+
+        /* Pestañas (Tabs) refinadas */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            padding-bottom: 4px;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            height: 40px;
+            border-radius: 8px;
+            padding: 0 16px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            transition: all 0.2s ease;
+        }
+
+        .stTabs [data-baseweb="tab"]:hover {
+            color: #722f37;
+            background: rgba(114, 47, 55, 0.04);
+        }
+
+        .stTabs [aria-selected="true"] {
+            color: #722f37 !important;
+            background: rgba(114, 47, 55, 0.08) !important;
+            border-bottom: 2px solid #722f37 !important;
+        }
+
+        /* Botones primarios y de descarga */
+        .stButton > button, .stDownloadButton > button {
+            border-radius: 9px !important;
+            font-weight: 600 !important;
+            padding: 8px 18px !important;
+            border: 1px solid rgba(114, 47, 55, 0.2) !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .stButton > button:hover, .stDownloadButton > button:hover {
+            background-color: #722f37 !important;
+            color: white !important;
+            border-color: #722f37 !important;
+            box-shadow: 0 4px 14px rgba(114, 47, 55, 0.25) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        /* Cajas de alerta */
+        .stAlert {
+            border-radius: 10px !important;
+            border: 1px solid rgba(0, 0, 0, 0.06) !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+        }
+
+        /* Barra lateral (Sidebar) */
+        [data-testid="stSidebar"] {
+            border-right: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        /* Tablas y DataFrames */
+        [data-testid="stDataFrame"] {
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+aplicar_estilos_ui()
+
 RANDOM_STATE = 42
 N_INIT = 10
 K_MIN, K_MAX = 2, 10
@@ -164,6 +282,15 @@ def pagina_datos():
             df_up = leer_archivo(archivo)
         except Exception as e:
             st.error(f"No se pudo leer el archivo: {e}")
+            return
+
+        if df_up.empty or df_up.shape[0] < 3:
+            st.error("⚠️ El archivo cargado está vacío o contiene menos de 3 filas. Sube un dataset válido.")
+            return
+
+        cols_num = df_up.select_dtypes(include=[np.number]).columns.tolist()
+        if len(cols_num) < 2:
+            st.error("⚠️ El archivo debe contener al menos 2 columnas numéricas para realizar análisis multivariado.")
             return
         opciones = ["(ninguna)"] + list(df_up.columns)
         elegida = st.selectbox("Columna de etiqueta externa (se excluye del clustering)", opciones)
@@ -800,6 +927,9 @@ def pagina_kmeans():
         st.subheader("Ajuste del modelo")
         k = st.slider("Número de clústeres K", K_MIN, k_max, min(k_sugerido, k_max), key="k_kmeans",
                       help="Cada cambio vuelve a entrenar K-Means y recalcula las métricas.")
+        if k >= n:
+            st.error(f"⚠️ El número de clústeres K ({k}) no puede ser mayor o igual al número de muestras ({n}).")
+            return
         labels, centros, inertia, n_iter = ajustar_kmeans(X, k)
         met, motivo = metricas_internas(X, labels)
 
@@ -1321,6 +1451,157 @@ def pagina_comparacion():
         help="Archivo CSV con 178 filas, variables fisicoquímicas y clústeres de K-Means y DBSCAN."
     )
 
+
+
+# ---------------------------------------------------------------- Conclusiones
+def pagina_conclusiones():
+    st.header("🏁 Conclusiones, Limitaciones y Recomendaciones")
+    st.caption("Cierre y entrega integral del proyecto · Sistemas Inteligentes y Machine Learning · Grupo 03")
+
+    st.markdown(
+        """
+        En este proyecto se abordó el descubrimiento no supervisado de patrones fisicoquímicos en muestras de vino,
+        evaluando el desempeño de **K-Means**, **DBSCAN** y **PCA** sobre 13 variables cuantitativas estandarizadas.
+        A continuación se consolidan los hallazgos, las 5 conclusiones cuantitativas, las 3 limitaciones técnicas
+        y las 3 recomendaciones estratégicas para la toma de decisiones enológicas e industriales.
+        """
+    )
+
+    pestanas = st.tabs([
+        "1. Síntesis y Perfiles",
+        "2. Las 5 Conclusiones",
+        "3. Limitaciones (3)",
+        "4. Recomendaciones (3)",
+        "5. Ficha Ejecutiva",
+    ])
+
+    # 1. Síntesis y Perfiles
+    with pestanas[0]:
+        st.subheader("Resumen Comparativo de Modelos y Perfiles Enológicos")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("K-Means Óptimo", "K = 3", "Silhouette = 0.285 (100% Cobertura)")
+        c2.metric("DBSCAN Óptimo", "eps = 2.30, min_samples = 5", "2 grupos + 23.6% Ruido (Silhouette = 0.331*)")
+        c3.metric("PCA Reducción", "3 Componentes", "66.5% Varianza Acumulada")
+        st.caption("*La métrica Silhouette de DBSCAN se calcula únicamente sobre las muestras densas asignadas, excluyendo el ruido.")
+
+        st.markdown("### Perfiles Químicos Descubiertos en los Vinos:")
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            st.markdown(
+                """
+                **🍇 Perfil A: Alta Estructura y Graduación (Clúster 0)**
+                * **Graduación alcohólica:** Elevada (~13.7 % vol).
+                * **Compuestos fenólicos:** Ricos en prolina (~1,115) y flavonoides (~2.98 g/L).
+                * **Color:** Alta intensidad cromática (~5.5).
+                * **Interpretación comercial:** Vinos con alta graduación y contenido fenólico elevado.
+                """
+            )
+        with col_p2:
+            st.markdown(
+                """
+                **🥂 Perfil B: Vinos Ligeros y Ácidos (Clúster 1)**
+                * **Graduación alcohólica:** Moderada a baja (~12.2 % vol).
+                * **Acidez y cenizas:** Alta alcalinidad de cenizas (~21.4) y prolina baja (~519).
+                * **Color:** Matices claros (hue alto ~1.06).
+                * **Interpretación comercial:** Vinos con menor graduación alcohólica y mayor alcalinidad de cenizas.
+                """
+            )
+        with col_p3:
+            st.markdown(
+                """
+                **🍷 Perfil C: Vinos Astringentes / Oxidativos (Clúster 2)**
+                * **Graduación alcohólica:** Media-alta (~13.1 % vol).
+                * **Compuestos fenólicos:** Muy baja concentración de flavonoides (~0.78 g/L) y baja relación od280/od315 (~1.68).
+                * **Acidez:** Alta concentración de ácido málico (~3.3 g/L).
+                * **Interpretación comercial:** Vinos con bajo contenido de flavonoides y acidez málica elevada.
+                """
+            )
+
+    # 2. Las 5 Conclusiones
+    with pestanas[1]:
+        st.subheader("Las 5 Conclusiones Centrales del Proyecto")
+        st.markdown(
+            r"""
+            1. **Descubrimiento de una estructura natural tripartita en los vinos:**
+               El análisis del método del codo (Inertia = 1,277.9) y el coeficiente de Silhouette (máximo global en $K = 3$ con 0.285) demostraron cuantitativamente que las 13 variables fisicoquímicas contienen información suficiente para segregar las 178 muestras en **tres perfiles químicos diferenciados**, mostrando un solapamiento inter-clúster moderado (Silhouette = 0.285) donde 172 de las 178 muestras (96.6%) corresponden al cultivar dominante de cada clúster.
+
+            2. **Efectividad de la reducción dimensional mediante PCA:**
+               La descomposición en componentes principales reveló una alta redundancia en el espacio original: los dos primeros componentes explican el **55.4%** de la varianza total (PC1 con 36.2% dominado por flavonoides y fenoles totales; PC2 con 19.2% dominado por color y alcohol), mientras que con **3 componentes se alcanza el 66.5%**, permitiendo una representación visual fidedigna sin pérdida crítica de información.
+
+            3. **Aislamiento eficaz de anomalías fisicoquímicas con DBSCAN:**
+               DBSCAN demostró ser una potente herramienta de auditoría de calidad al clasificar **42 muestras (23.6%) como ruido (-1)**. El análisis estadístico evidenció que estas muestras poseen un valor $|z|$ extremo superior al promedio del dataset, reuniendo vinos con acidez málica desmedida o concentraciones inusuales de magnesio correspondientes a los atípicos detectados en el EDA.
+
+            4. **Impacto determinante de la estandarización multivariada:**
+               El preprocesamiento mediante `StandardScaler` ($\mu = 0, \sigma = 1$) resultó mandatorio. Variables como `proline` (con rango original de 1,402) habrían dominado desproporcionadamente la suma de distancias euclídeas de no haber sido escaladas. La normalización otorgó un peso equitativo a marcadores traza como los flavonoides, garantizando una segmentación basada en la identidad química global del vino.
+
+            5. **Sinergia metodológica para la industria vitivinícola:**
+               Ningún algoritmo reemplaza al otro: **K-Means** es el método óptimo para la **segmentación comercial total** (cobertura del 100% de los lotes para catálogo de venta), mientras que **DBSCAN** es insustituible en el **control de calidad de laboratorio** (para descartar lotes defectuosos o vendimias anómalas antes del envasado).
+            """
+        )
+
+    # 3. Limitaciones
+    with pestanas[2]:
+        st.subheader("Limitaciones Técnicas del Estudio (3)")
+        st.markdown(
+            """
+            * ⚠️ **Limitación 1: Supuestos de esfericidad e isometría en K-Means:**
+              K-Means impone particiones convexas y esféricas en el espacio multidimensional. Aquellas muestras ubicadas en los límites difusos entre cultivares son forzadas a un centroide, ignorando la incertidumbre de frontera.
+
+            * ⚠️ **Limitación 2: Sensibilidad de DBSCAN ante densidades variables en alta dimensión:**
+              En un espacio de 13 dimensiones, el fenómeno de la "maldición de la dimensionalidad" dispersa las distancias relativas. Por ello, una variación leve en el parámetro `eps` (por ejemplo, de 2.30 a 2.50) provoca que los clústeres se fusionen masivamente o que el ruido aumente drásticamente, exigiendo una calibración empírica minuciosa del gráfico k-distance.
+
+            * ⚠️ **Limitación 3: Tamaño y representatividad geográfica de la muestra:**
+              El conjunto de datos consta de 178 registros correspondientes a tres variedades cultivadas en una región específica de Italia en 1992. Los umbrales numéricos obtenidos no pueden extrapolarse directamente a vinos de climas tropicales o del nuevo mundo sin un reentrenamiento con lotes contemporáneos locales.
+            """
+        )
+
+    # 4. Recomendaciones
+    with pestanas[3]:
+        st.subheader("Recomendaciones Metodológicas y Prácticas (3)")
+        st.markdown(
+            """
+            * 💡 **Recomendación 1: Implementación de un pipeline de dos fases en planta enológica:**
+              Se recomienda adoptar un flujo operativo en cascada: primero, someter los lotes entrantes a **DBSCAN** para identificar y separar anomalías y defectos; segundo, clasificar los lotes aprobados mediante **K-Means** ($K=3$) para asignar su línea comercial (Crianza, Joven, Varietal).
+
+            * 💡 **Recomendación 2: Ejecución de clustering sobre el espacio latente de PCA:**
+              Para optimizar la velocidad y estabilidad de algoritmos basados en densidad, se sugiere proyectar previamente las 13 variables sobre las primeras 3 componentes principales (66.5% varianza) antes de aplicar DBSCAN, eliminando el ruido residual de las variables poco informativas.
+
+            * 💡 **Recomendación 3: Incorporación de variables organolépticas y climáticas:**
+              Complementar los parámetros de laboratorio con variables sensoriales obtenidas por paneles de cata profesionales (astringencia percibida, persistencia aromática) y metadatos de añada (horas de sol, régimen de lluvias) para enriquecer la interpretabilidad comercial de los clústeres.
+            """
+        )
+
+    # 5. Ficha Ejecutiva
+    with pestanas[4]:
+        st.subheader("Ficha de Entrega y Resumen Ejecutivo")
+        ficha_texto = """# INFORME FINAL DE PROYECTO
+Curso: Sistemas Inteligentes y Machine Learning
+Grupo: 03 · UPN
+Tema: Descubrimiento de patrones fisicoquímicos en vinos (K-Means, DBSCAN y PCA)
+
+1. MODELO K-MEANS:
+   - Configuración óptima: K = 3 (K-Means++, n_init=10, random_state=42)
+   - Métricas: Inertia = 1277.9 | Silhouette = 0.285 | Davies-Bouldin = 1.389 | Calinski-Harabasz = 70.9
+   - Cobertura: 100% de las 178 muestras asignadas a 3 perfiles comerciales.
+
+2. MODELO DBSCAN:
+   - Configuración óptima: eps = 2.30, min_samples = 5 (distancia euclídea)
+   - Resultados: 2 clústeres densos + 42 muestras de ruido (23.6%)
+   - Silhouette (sin ruido): 0.331 | Davies-Bouldin: 1.182 | Calinski-Harabasz = 70.5
+
+3. MODELO PCA:
+   - Dimensiones reducidas: 13 variables -> 3 Componentes Principales
+   - Varianza explicada: PC1 (36.2%) + PC2 (19.2%) + PC3 (11.1%) = 66.5% acumulada
+"""
+        st.code(ficha_texto, language="markdown")
+        st.download_button(
+            label="📥 Descargar Ficha Ejecutiva de Conclusiones (.txt)",
+            data=ficha_texto,
+            file_name="resumen_ejecutivo_conclusiones.txt",
+            mime="text/plain",
+        )
+
+
 # ------------------------------------------------------------------ Main
 PAGINAS = {
     "Inicio": pagina_inicio,
@@ -1331,6 +1612,7 @@ PAGINAS = {
     "DBSCAN": pagina_dbscan,
     "PCA": pagina_pca,             
     "Comparación": pagina_comparacion, 
+    "Conclusiones": pagina_conclusiones,
 }
 
 st.sidebar.title("🍷 Navegación")
