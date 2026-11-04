@@ -2,13 +2,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import streamlit as st
-from sklearn.cluster import DBSCAN, KMeans
-from sklearn.datasets import load_wine
 from sklearn.decomposition import PCA
-from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, silhouette_score
-from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
+import streamlit as st
 
 try:
     import seaborn as sns
@@ -16,222 +12,71 @@ try:
 except ImportError:
     HAS_SEABORN = False
 
-st.set_page_config(page_title="Agrupamiento de vinos", page_icon="🍷", layout="wide")
+# Configuración global e incondicional de tema oscuro para Matplotlib y Seaborn
+plt.style.use("dark_background")
+plt.rcParams.update({
+    "figure.facecolor": "#0e1117",
+    "axes.facecolor": "#161922",
+    "savefig.facecolor": "#0e1117",
+    "savefig.edgecolor": "none",
+    "text.color": "#f0f2f6",
+    "axes.labelcolor": "#f0f2f6",
+    "axes.edgecolor": "#333846",
+    "axes.linewidth": 0.8,
+    "xtick.color": "#94a3b8",
+    "ytick.color": "#94a3b8",
+    "xtick.labelsize": 8.5,
+    "ytick.labelsize": 8.5,
+    "grid.color": "#232836",
+    "grid.linestyle": "--",
+    "grid.alpha": 0.6,
+    "legend.facecolor": "#1c202c",
+    "legend.edgecolor": "#333846",
+    "legend.labelcolor": "#f0f2f6",
+    "legend.fontsize": 8.5,
+    "figure.titlesize": 12,
+    "axes.titlesize": 11,
+})
 
-def aplicar_estilos_ui():
-    """Aplica diseño moderno, enológico y de alta gama a la interfaz Streamlit."""
-    st.markdown(
-        """
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        
-        html, body, [class*="css"] {
-            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-        }
+# Módulos desacoplados del proyecto
+from src.styles import aplicar_estilos_ui, COLOR_RUIDO
+from src.data_loader import (
+    SECCIONES,
+    FICHA,
+    cargar_wine,
+    leer_archivo,
+    obtener_datos,
+    en_construccion,
+    requerir_datos,
+    obtener_datos_preprocesados,
+    matriz_para_clustering,
+)
+from src.models import (
+    RANDOM_STATE,
+    N_INIT,
+    K_MIN,
+    K_MAX,
+    EPS_DEFECTO,
+    MIN_SAMPLES_DEFECTO,
+    GRILLA_EPS,
+    GRILLA_MIN_SAMPLES,
+    metricas_internas,
+    evaluar_rango_k,
+    ajustar_kmeans,
+    distancias_k,
+    ajustar_dbscan,
+    sensibilidad_dbscan,
+)
+from src.plots import (
+    HAS_SEABORN,
+    proyeccion_2d,
+    colores_clusters,
+    dibujar_heatmap,
+    tabla_vs_etiqueta,
+)
 
-        h1, h2, h3 {
-            font-weight: 700 !important;
-            letter-spacing: -0.02em !important;
-        }
-        
-        h1 {
-            color: #722f37 !important;
-        }
-
-        /* Tarjetas de métricas modernas (KPIs) */
-        [data-testid="stMetric"] {
-            background: rgba(114, 47, 55, 0.035);
-            border: 1px solid rgba(114, 47, 55, 0.12);
-            border-radius: 12px;
-            padding: 14px 18px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 12px rgba(0, 0, 0, 0.03);
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        
-        [data-testid="stMetric"]:hover {
-            border-color: rgba(114, 47, 55, 0.28);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(114, 47, 55, 0.08);
-        }
-
-        [data-testid="stMetricLabel"] {
-            font-size: 0.82rem !important;
-            font-weight: 600 !important;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        [data-testid="stMetricValue"] {
-            font-size: 1.65rem !important;
-            font-weight: 800 !important;
-            color: #722f37 !important;
-        }
-
-        /* Pestañas (Tabs) refinadas */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-            padding-bottom: 4px;
-        }
-
-        .stTabs [data-baseweb="tab"] {
-            height: 40px;
-            border-radius: 8px;
-            padding: 0 16px;
-            font-weight: 600;
-            font-size: 0.88rem;
-            transition: all 0.2s ease;
-        }
-
-        .stTabs [data-baseweb="tab"]:hover {
-            color: #722f37;
-            background: rgba(114, 47, 55, 0.04);
-        }
-
-        .stTabs [aria-selected="true"] {
-            color: #722f37 !important;
-            background: rgba(114, 47, 55, 0.08) !important;
-            border-bottom: 2px solid #722f37 !important;
-        }
-
-        /* Botones primarios y de descarga */
-        .stButton > button, .stDownloadButton > button {
-            border-radius: 9px !important;
-            font-weight: 600 !important;
-            padding: 8px 18px !important;
-            border: 1px solid rgba(114, 47, 55, 0.2) !important;
-            transition: all 0.2s ease !important;
-        }
-
-        .stButton > button:hover, .stDownloadButton > button:hover {
-            background-color: #722f37 !important;
-            color: white !important;
-            border-color: #722f37 !important;
-            box-shadow: 0 4px 14px rgba(114, 47, 55, 0.25) !important;
-            transform: translateY(-1px) !important;
-        }
-
-        /* Cajas de alerta */
-        .stAlert {
-            border-radius: 10px !important;
-            border: 1px solid rgba(0, 0, 0, 0.06) !important;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
-        }
-
-        /* Barra lateral (Sidebar) */
-        [data-testid="stSidebar"] {
-            border-right: 1px solid rgba(0, 0, 0, 0.06);
-        }
-
-        /* Tablas y DataFrames */
-        [data-testid="stDataFrame"] {
-            border-radius: 10px;
-            overflow: hidden;
-            border: 1px solid rgba(0, 0, 0, 0.06);
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
+st.set_page_config(page_title="Agrupamiento de vinos", page_icon="🍷", layout="wide", initial_sidebar_state="collapsed")
 aplicar_estilos_ui()
-
-RANDOM_STATE = 42
-N_INIT = 10
-K_MIN, K_MAX = 2, 10
-EPS_DEFECTO, MIN_SAMPLES_DEFECTO = 2.3, 5
-GRILLA_EPS = [1.8, 2.0, 2.2, 2.3, 2.5, 2.8, 3.0]
-GRILLA_MIN_SAMPLES = [3, 4, 5, 7, 10]
-COLOR_RUIDO = "#9e9e9e"
-
-SECCIONES = [
-    "Inicio",
-    "Datos",
-    "EDA",
-    "Preprocesamiento",
-    "K-Means",
-    "DBSCAN",
-    "PCA",
-    "Comparación",
-    "Conclusiones",
-]
-
-FICHA = {
-    "Dataset": "Wine — UCI Machine Learning Repository",
-    "Enlace": "https://archive.ics.uci.edu/dataset/109/wine",
-    "DOI": "10.24432/C5PC7J",
-    "Autores": "Stefan Aeberhard y M. Forina (1992)",
-    "Licencia": "CC BY 4.0",
-    "Unidad de observación": "Muestra de vino",
-    "Etiqueta externa": "class (3 cultivares): se excluye del clustering",
-}
-
-
-@st.cache_data
-def cargar_wine() -> pd.DataFrame:
-    """Dataset Wine incluido en scikit-learn (13 variables + 'target')."""
-    return load_wine(as_frame=True).frame
-
-
-@st.cache_data
-def leer_archivo(archivo) -> pd.DataFrame:
-    """Lee un CSV/Excel subido por el usuario."""
-    if archivo.name.lower().endswith((".xlsx", ".xls")):
-        return pd.read_excel(archivo)
-    return pd.read_csv(archivo)
-
-
-def obtener_datos():
-    """Devuelve (df, columna_etiqueta) guardados en session_state."""
-    return st.session_state.get("df"), st.session_state.get("etiqueta")
-
-
-def en_construccion(nombre: str):
-    st.header(nombre)
-    st.info("Sección en construcción.")
-
-
-def requerir_datos():
-    """Comprueba si hay datos cargados; si no, ofrece cargarlos inmediatamente."""
-    df, etiqueta = obtener_datos()
-    if df is None:
-        st.warning("⚠️ Aún no se han cargado datos. Puedes cargarlos en la sección **Datos** o hacer clic abajo:")
-        if st.button("🍷 Cargar dataset Wine por defecto"):
-            st.session_state["df"] = cargar_wine()
-            st.session_state["etiqueta"] = "target"
-            st.rerun()
-        return None, None
-    return df, etiqueta
-
-
-def obtener_datos_preprocesados():
-    """
-    Devuelve (X_final, X_raw, vars_x, scaler_obj) guardados en session_state.
-    Si aún no se han procesado en la sección 'Preprocesamiento', los prepara
-    automáticamente con la configuración estándar (StandardScaler).
-    Permite que la Parte 3 (K-Means / DBSCAN) y Parte 4 (PCA) consuman la matriz inmediatamente.
-    """
-    df, etiqueta = requerir_datos()
-    if df is None:
-        return None, None, None, None
-
-    if "X_final" not in st.session_state:
-        vars_x = [c for c in df.columns if c != etiqueta]
-        X_raw = df[vars_x].copy()
-        scaler = StandardScaler()
-        X_final = pd.DataFrame(scaler.fit_transform(X_raw), columns=vars_x)
-        st.session_state["X_final"] = X_final
-        st.session_state["X_raw"] = X_raw
-        st.session_state["scaler_obj"] = scaler
-        st.session_state["scaler_nombre"] = "StandardScaler"
-        st.session_state["vars_x"] = vars_x
-
-    return (
-        st.session_state["X_final"],
-        st.session_state["X_raw"],
-        st.session_state["vars_x"],
-        st.session_state["scaler_obj"],
-    )
 
 
 # ---------------------------------------------------------------- Inicio
@@ -348,13 +193,19 @@ def pagina_eda():
 
         st.markdown("**Resumen de tipos de datos y valores faltantes por columna:**")
         info_df = pd.DataFrame({
-            "Tipo de Dato": df_vars.dtypes.astype(str),
-            "Valores Presentes": df_vars.count(),
-            "Valores Nulos": df_vars.isnull().sum(),
-            "% Nulos": (df_vars.isnull().mean() * 100).round(2),
-            "Valores Únicos": df_vars.nunique(),
+            "Variable": df_vars.columns,
+            "Tipo de Dato": df_vars.dtypes.astype(str).values,
+            "Valores Presentes": df_vars.count().values,
+            "Valores Nulos": df_vars.isnull().sum().values,
+            "% Nulos": (df_vars.isnull().mean() * 100).round(2).values,
+            "Valores Únicos": df_vars.nunique().values,
         })
-        st.dataframe(info_df, use_container_width=True)
+        st.dataframe(
+            info_df,
+            use_container_width=True,
+            hide_index=True,
+            height=(len(info_df) + 1) * 36 + 10,
+        )
         if df_vars.isnull().sum().sum() == 0:
             st.success("✅ No existen valores nulos ni registros duplicados en las variables fisicoquímicas.")
 
@@ -373,7 +224,13 @@ def pagina_eda():
             "iqr": "IQR", "skewness": "Asimetría"
         }
         desc_mostrar = desc[columnas_orden].rename(columns=nombres_amigables).round(3)
-        st.dataframe(desc_mostrar, use_container_width=True)
+        desc_mostrar.insert(0, "Variable", desc_mostrar.index)
+        st.dataframe(
+            desc_mostrar,
+            use_container_width=True,
+            hide_index=True,
+            height=(len(desc_mostrar) + 1) * 36 + 10,
+        )
 
         st.info(
             "💡 **Observación crítica de escalas:** Las variables presentan magnitudes y rangos drásticamente dispares. "
@@ -402,11 +259,11 @@ def pagina_eda():
 
             fig, ax = plt.subplots(figsize=(8, 4))
             if HAS_SEABORN:
-                sns.histplot(df_vars[var_sel], kde=True, color="#722f37", ax=ax, bins=20, edgecolor="black", alpha=0.6)
+                sns.histplot(df_vars[var_sel], kde=True, color="#f43f5e", ax=ax, bins=20, edgecolor="#161922", alpha=0.75)
             else:
-                ax.hist(df_vars[var_sel], bins=20, color="#722f37", edgecolor="black", alpha=0.6)
-            ax.axvline(media, color="blue", linestyle="--", linewidth=1.8, label=f"Media ({media:.2f})")
-            ax.axvline(mediana, color="green", linestyle="-.", linewidth=1.8, label=f"Mediana ({mediana:.2f})")
+                ax.hist(df_vars[var_sel], bins=20, color="#f43f5e", edgecolor="#161922", alpha=0.75)
+            ax.axvline(media, color="#38bdf8", linestyle="--", linewidth=1.8, label=f"Media ({media:.2f})")
+            ax.axvline(mediana, color="#34d399", linestyle="-.", linewidth=1.8, label=f"Mediana ({mediana:.2f})")
             ax.set_title(f"Distribución de {var_sel}", fontsize=12, fontweight="bold")
             ax.set_xlabel(var_sel)
             ax.set_ylabel("Frecuencia")
@@ -418,9 +275,9 @@ def pagina_eda():
             axes_flat = axes.flatten()
             for i, col in enumerate(vars_analisis):
                 if HAS_SEABORN:
-                    sns.histplot(df_vars[col], kde=True, ax=axes_flat[i], color="#722f37", bins=15)
+                    sns.histplot(df_vars[col], kde=True, ax=axes_flat[i], color="#f43f5e", bins=15, edgecolor="#161922", alpha=0.75)
                 else:
-                    axes_flat[i].hist(df_vars[col], bins=15, color="#722f37", edgecolor="black", alpha=0.6)
+                    axes_flat[i].hist(df_vars[col], bins=15, color="#f43f5e", edgecolor="#161922", alpha=0.75)
                 axes_flat[i].set_title(col, fontsize=10, fontweight="bold")
                 axes_flat[i].set_xlabel("")
                 axes_flat[i].set_ylabel("")
@@ -449,57 +306,171 @@ def pagina_eda():
                 "% Outliers": round((conteo / len(df_vars)) * 100, 2),
             }
         df_outliers = pd.DataFrame(outliers_dict).T.sort_values(by="Cant. Outliers", ascending=False)
+        df_outliers_mostrar = df_outliers.reset_index().rename(columns={"index": "Variable"})
 
-        col_t1, col_t2 = st.columns([1, 2])
-        with col_t1:
-            st.markdown("**Resumen de atípicos (Criterio $1.5 \\times IQR$):**")
-            st.dataframe(df_outliers, use_container_width=True)
-        with col_t2:
-            st.markdown("**Inspección visual de boxplots:**")
-            var_box = st.selectbox("Selecciona variable para boxplot:", vars_analisis, key="box_sel")
-            fig, ax = plt.subplots(figsize=(7, 3.5))
-            if HAS_SEABORN:
-                sns.boxplot(x=df_vars[var_box], color="#deb887", ax=ax, flierprops={"marker": "o", "color": "red", "markersize": 6})
-            else:
-                ax.boxplot(df_vars[var_box], vert=False, patch_artist=True, boxprops=dict(facecolor="#deb887"))
-            ax.set_title(f"Diagrama de Caja de {var_box}", fontsize=11, fontweight="bold")
+        modo_box = st.radio(
+            "Modo de visualización de boxplots:",
+            ["Variable individual a detalle", "Ver todas en cuadrícula"],
+            horizontal=True,
+            key="modo_box_sel",
+        )
+
+        col_config_outliers = {
+            "Variable": st.column_config.TextColumn("Variable", width="medium"),
+            "Límite Inferior": st.column_config.NumberColumn("Lím. Inferior", format="%.2f"),
+            "Límite Superior": st.column_config.NumberColumn("Lím. Superior", format="%.2f"),
+            "Cant. Outliers": st.column_config.NumberColumn("Cant. Outliers", format="%d"),
+            "% Outliers": st.column_config.NumberColumn("% Outliers", format="%.2f%%"),
+        }
+
+        if modo_box == "Variable individual a detalle":
+            col_t1, col_t2 = st.columns([1.4, 1.0], gap="large")
+            with col_t1:
+                st.markdown("**Resumen de atípicos (Criterio $1.5 \times IQR$):**")
+                st.dataframe(
+                    df_outliers_mostrar,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=(len(df_outliers_mostrar) + 1) * 36 + 10,
+                    column_config=col_config_outliers,
+                )
+            with col_t2:
+                st.markdown("**Inspección visual de boxplots:**")
+                var_box = st.selectbox("Selecciona variable para boxplot:", vars_analisis, key="box_sel")
+
+                q25_v = df_vars[var_box].quantile(0.25)
+                q75_v = df_vars[var_box].quantile(0.75)
+                n_out_v = outliers_dict[var_box]["Cant. Outliers"]
+
+                col_b1, col_b2, col_b3 = st.columns(3)
+                col_b1.metric("Q1 (25%)", f"{q25_v:.2f}")
+                col_b2.metric("Mediana", f"{df_vars[var_box].median():.2f}")
+                col_b3.metric("Outliers", f"{n_out_v}")
+
+                fig, ax = plt.subplots(figsize=(6.5, 3.8))
+                if HAS_SEABORN:
+                    sns.boxplot(
+                        x=df_vars[var_box],
+                        color="#f43f5e",
+                        ax=ax,
+                        flierprops={"marker": "o", "color": "#f87171", "markersize": 6, "markeredgecolor": "#ffffff"},
+                        boxprops={"edgecolor": "#ffffff", "linewidth": 1},
+                        whiskerprops={"color": "#e2e8f0", "linewidth": 1},
+                        capprops={"color": "#e2e8f0", "linewidth": 1},
+                        medianprops={"color": "#fbbf24", "linewidth": 2},
+                    )
+                else:
+                    ax.boxplot(
+                        df_vars[var_box],
+                        vert=False,
+                        patch_artist=True,
+                        boxprops=dict(facecolor="#f43f5e", edgecolor="#ffffff"),
+                        whiskerprops=dict(color="#e2e8f0"),
+                        capprops=dict(color="#e2e8f0"),
+                        medianprops=dict(color="#fbbf24", linewidth=2),
+                        flierprops=dict(marker="o", markerfacecolor="#f87171", markersize=6, markeredgecolor="#ffffff"),
+                    )
+                ax.set_title(f"Diagrama de Caja de {var_box}", fontsize=11, fontweight="bold")
+                ax.set_xlabel(var_box)
+                plt.tight_layout()
+                st.pyplot(fig)
+                plt.close(fig)
+        else:
+            st.markdown("**Resumen de atípicos (Criterio $1.5 \times IQR$):**")
+            st.dataframe(
+                df_outliers_mostrar,
+                use_container_width=True,
+                hide_index=True,
+                height=(len(df_outliers_mostrar) + 1) * 36 + 10,
+                column_config=col_config_outliers,
+            )
+            st.markdown("---")
+            st.markdown("**Cuadrícula de Diagramas de Caja (todas las variables fisicoquímicas):**")
+            fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(16, 12))
+            axes_flat = axes.flatten()
+            for i, col in enumerate(vars_analisis):
+                ax = axes_flat[i]
+                if HAS_SEABORN:
+                    sns.boxplot(
+                        x=df_vars[col],
+                        color="#f43f5e",
+                        ax=ax,
+                        flierprops={"marker": "o", "color": "#f87171", "markersize": 5, "markeredgecolor": "#ffffff"},
+                        boxprops={"edgecolor": "#ffffff", "linewidth": 0.8},
+                        whiskerprops={"color": "#e2e8f0", "linewidth": 0.8},
+                        capprops={"color": "#e2e8f0", "linewidth": 0.8},
+                        medianprops={"color": "#fbbf24", "linewidth": 1.8},
+                    )
+                else:
+                    ax.boxplot(
+                        df_vars[col],
+                        vert=False,
+                        patch_artist=True,
+                        boxprops=dict(facecolor="#f43f5e", edgecolor="#ffffff"),
+                        whiskerprops=dict(color="#e2e8f0"),
+                        capprops=dict(color="#e2e8f0"),
+                        medianprops=dict(color="#fbbf24", linewidth=1.8),
+                        flierprops=dict(marker="o", markerfacecolor="#f87171", markersize=5, markeredgecolor="#ffffff"),
+                    )
+                n_out = outliers_dict[col]["Cant. Outliers"]
+                titulo_color = "#c0392b" if n_out > 0 else "#2c3e50"
+                ax.set_title(f"{col} ({n_out} atípicos)", fontsize=10, fontweight="bold", color=titulo_color)
+                ax.set_xlabel("")
+            for j in range(len(vars_analisis), len(axes_flat)):
+                fig.delaxes(axes_flat[j])
+            plt.tight_layout()
             st.pyplot(fig)
             plt.close(fig)
 
-        st.caption("Variables con outliers detectados: `malic_acid`, `ash`, `alcalinity_of_ash`, `magnesium`, `proanthocyanins`, `color_intensity` y `hue`.")
+        st.caption("Variables con outliers detectados: `magnesium` (4), `alcalinity_of_ash` (4), `color_intensity` (4), `malic_acid` (3), `ash` (3), `proanthocyanins` (2) y `hue` (1).")
 
     # 5. Correlación
     with pestanas[4]:
         st.subheader("5. Matriz de correlación lineal de Pearson")
         corr = df_vars.corr()
 
-        fig, ax = plt.subplots(figsize=(10, 8))
+        vista_matriz = st.radio(
+            "Modo de visualización de la matriz:",
+            ["Matriz Completa (13×13, como en el informe)", "Triángulo Inferior (sin redundancia)"],
+            horizontal=True,
+            key="vista_corr_matriz",
+        )
+
+        fig, ax = plt.subplots(figsize=(10.5, 8.5))
+        mask = np.triu(np.ones_like(corr, dtype=bool)) if vista_matriz.startswith("Triángulo") else None
+
         if HAS_SEABORN:
-            mask = np.triu(np.ones_like(corr, dtype=bool))
             sns.heatmap(
                 corr,
                 mask=mask,
-                cmap="vlag",
+                cmap="coolwarm",
+                vmin=-1.0,
+                vmax=1.0,
+                center=0.0,
                 annot=True,
                 fmt=".2f",
-                linewidths=0.5,
+                linewidths=0.6,
+                linecolor="#161922",
                 ax=ax,
-                cbar_kws={"shrink": 0.8},
-                annot_kws={"size": 8},
+                cbar_kws={"label": "Coeficiente de Correlación de Pearson (r)", "shrink": 0.82},
+                annot_kws={"size": 8, "weight": "bold"},
             )
         else:
             cax = ax.imshow(corr, cmap="coolwarm", vmin=-1, vmax=1)
-            fig.colorbar(cax, ax=ax, shrink=0.8)
+            cbar = fig.colorbar(cax, ax=ax, shrink=0.82)
+            cbar.set_label("Coeficiente de Correlación de Pearson (r)")
             ax.set_xticks(range(len(corr.columns)))
             ax.set_yticks(range(len(corr.columns)))
             ax.set_xticklabels(corr.columns, rotation=90, fontsize=8)
             ax.set_yticklabels(corr.columns, fontsize=8)
             for r in range(len(corr.columns)):
                 for c in range(len(corr.columns)):
+                    if mask is not None and mask[r, c]:
+                        continue
                     val = corr.iloc[r, c]
-                    ax.text(c, r, f"{val:.2f}", ha="center", va="center", color="black" if abs(val) < 0.6 else "white", fontsize=7)
+                    ax.text(c, r, f"{val:.2f}", ha="center", va="center", color="black" if abs(val) < 0.6 else "white", fontsize=7.5, weight="bold")
 
-        ax.set_title("Matriz de Correlación", fontsize=13, fontweight="bold")
+        ax.set_title("Figura 3. Matriz de Correlación Lineal de Pearson (13 Variables Químicas)", fontsize=11.5, fontweight="bold", pad=12)
         st.pyplot(fig)
         plt.close(fig)
 
@@ -522,10 +493,10 @@ def pagina_eda():
             fig_d1, ax_d1 = plt.subplots(figsize=(6, 4))
             x1 = df_vars["total_phenols"]
             y1 = df_vars["flavanoids"]
-            ax_d1.scatter(x1, y1, color="#722f37", edgecolors="black", linewidth=0.6, alpha=0.7, s=45)
+            ax_d1.scatter(x1, y1, color="#f43f5e", edgecolors="#ffffff", linewidth=0.5, alpha=0.8, s=50)
             m1, b1 = np.polyfit(x1, y1, 1)
             x_vals1 = np.linspace(x1.min(), x1.max(), 100)
-            ax_d1.plot(x_vals1, m1 * x_vals1 + b1, color="#003366", linestyle="--", linewidth=1.8, label=f"Tendencia (r = +0.865)")
+            ax_d1.plot(x_vals1, m1 * x_vals1 + b1, color="#38bdf8", linestyle="--", linewidth=2.2, label=f"Tendencia (r = +0.865)")
             ax_d1.set_title("total_phenols vs. flavanoids", fontsize=11, fontweight="bold")
             ax_d1.set_xlabel("total_phenols [g/L]")
             ax_d1.set_ylabel("flavanoids [g/L]")
@@ -538,10 +509,10 @@ def pagina_eda():
             fig_d2, ax_d2 = plt.subplots(figsize=(6, 4))
             x2 = df_vars["alcohol"]
             y2 = df_vars["proline"]
-            ax_d2.scatter(x2, y2, color="#2e6f40", edgecolors="black", linewidth=0.6, alpha=0.7, s=45)
+            ax_d2.scatter(x2, y2, color="#34d399", edgecolors="#ffffff", linewidth=0.5, alpha=0.8, s=50)
             m2, b2 = np.polyfit(x2, y2, 1)
             x_vals2 = np.linspace(x2.min(), x2.max(), 100)
-            ax_d2.plot(x_vals2, m2 * x_vals2 + b2, color="#8b0000", linestyle="--", linewidth=1.8, label=f"Tendencia (r = +0.644)")
+            ax_d2.plot(x_vals2, m2 * x_vals2 + b2, color="#fbbf24", linestyle="--", linewidth=2.2, label=f"Tendencia (r = +0.644)")
             ax_d2.set_title("alcohol vs. proline", fontsize=11, fontweight="bold")
             ax_d2.set_xlabel("alcohol [% vol]")
             ax_d2.set_ylabel("proline [mg/L]")
@@ -621,14 +592,30 @@ def pagina_preprocesamiento():
         st.markdown("**Comparación de Boxplots: Original vs StandardScaler vs RobustScaler**")
         fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(14, 11), sharex=False)
         
+        flierprops = dict(marker="o", markerfacecolor="none", markeredgecolor="#ffffff", markeredgewidth=1.2, markersize=5.5)
+
         if HAS_SEABORN:
-            sns.boxplot(data=X_raw, ax=axes[0], orient="h", color="#b0c4de")
-            sns.boxplot(data=X_std, ax=axes[1], orient="h", color="#90ee90")
-            sns.boxplot(data=X_rob, ax=axes[2], orient="h", color="#ffb6c1")
+            sns.boxplot(data=X_raw, ax=axes[0], orient="h", color="#38bdf8", linecolor="#ffffff", linewidth=1.2, flierprops=flierprops)
+            sns.boxplot(data=X_std, ax=axes[1], orient="h", color="#34d399", linecolor="#ffffff", linewidth=1.2, flierprops=flierprops)
+            sns.boxplot(data=X_rob, ax=axes[2], orient="h", color="#f43f5e", linecolor="#ffffff", linewidth=1.2, flierprops=flierprops)
         else:
-            axes[0].boxplot([X_raw[c] for c in vars_x], vert=False, tick_labels=vars_x, patch_artist=True, boxprops=dict(facecolor="#b0c4de"))
-            axes[1].boxplot([X_std[c] for c in vars_x], vert=False, tick_labels=vars_x, patch_artist=True, boxprops=dict(facecolor="#90ee90"))
-            axes[2].boxplot([X_rob[c] for c in vars_x], vert=False, tick_labels=vars_x, patch_artist=True, boxprops=dict(facecolor="#ffb6c1"))
+            props_box_raw = dict(facecolor="#38bdf8", edgecolor="#ffffff", linewidth=1.2)
+            props_box_std = dict(facecolor="#34d399", edgecolor="#ffffff", linewidth=1.2)
+            props_box_rob = dict(facecolor="#f43f5e", edgecolor="#ffffff", linewidth=1.2)
+            props_line = dict(color="#ffffff", linewidth=1.2)
+
+            axes[0].boxplot([X_raw[c] for c in vars_x], vert=False, tick_labels=vars_x, patch_artist=True,
+                            boxprops=props_box_raw, whiskerprops=props_line, capprops=props_line,
+                            medianprops=props_line, flierprops=flierprops)
+            axes[1].boxplot([X_std[c] for c in vars_x], vert=False, tick_labels=vars_x, patch_artist=True,
+                            boxprops=props_box_std, whiskerprops=props_line, capprops=props_line,
+                            medianprops=props_line, flierprops=flierprops)
+            axes[2].boxplot([X_rob[c] for c in vars_x], vert=False, tick_labels=vars_x, patch_artist=True,
+                            boxprops=props_box_rob, whiskerprops=props_line, capprops=props_line,
+                            medianprops=props_line, flierprops=flierprops)
+
+        for ax_i in axes:
+            ax_i.grid(True, axis="x", linestyle="--", alpha=0.35, color="#333846")
 
         axes[0].set_title("1. Datos Originales (Rangos dispares: Proline domina la escala)", fontsize=11, fontweight="bold")
         axes[0].set_xlabel("Escala original")
@@ -716,146 +703,6 @@ X_scaled = pd.DataFrame(scaler.fit_transform(X), columns=features)
     )
 
 
-# ------------------------------------------------- Utilidades de clustering
-def matriz_para_clustering():
-    """Obtiene la matriz X de la Parte 2 y valida que sirva para agrupar."""
-    try:
-        X_final, X_raw, vars_x, scaler = obtener_datos_preprocesados()
-    except (ValueError, TypeError) as e:
-        st.error(
-            "No se pudo preparar la matriz X. Verifica que todas las columnas (salvo la etiqueta) "
-            f"sean numéricas y no tengan nulos. Detalle: {e}"
-        )
-        return None, None, None, None
-    if X_final is None:
-        return None, None, None, None
-    if X_final.isna().any().any():
-        st.error("La matriz X contiene valores nulos; K-Means y DBSCAN no pueden calcularse.")
-        return None, None, None, None
-    if X_final.shape[0] < 3:
-        st.error("Se necesitan al menos 3 registros para agrupar y calcular métricas.")
-        return None, None, None, None
-    st.caption(
-        f"Matriz X: {X_final.shape[0]} muestras × {X_final.shape[1]} variables · "
-        f"escalado: **{st.session_state.get('scaler_nombre', 'StandardScaler')}** · etiqueta externa excluida."
-    )
-    return X_final, X_raw, vars_x, scaler
-
-
-def metricas_internas(X: np.ndarray, labels: np.ndarray):
-    """Silhouette, Davies-Bouldin y Calinski-Harabasz sobre los puntos con etiqueta != -1.
-
-    Devuelve (dict, None) o (None, motivo) cuando las métricas no son calculables.
-    """
-    mascara = labels != -1
-    Xv, lv = X[mascara], labels[mascara]
-    n_grupos = len(np.unique(lv))
-    if n_grupos < 2:
-        return None, "se necesitan al menos 2 clústeres (sin contar el ruido)"
-    if n_grupos >= len(lv):
-        return None, "cada punto forma su propio clúster"
-    return {
-        "Silhouette": float(silhouette_score(Xv, lv)),
-        "Davies-Bouldin": float(davies_bouldin_score(Xv, lv)),
-        "Calinski-Harabasz": float(calinski_harabasz_score(Xv, lv)),
-    }, None
-
-
-@st.cache_data
-def evaluar_rango_k(X: np.ndarray, k_min: int, k_max: int) -> pd.DataFrame:
-    """Ajusta K-Means para cada K del rango y devuelve inertia y métricas internas."""
-    filas = []
-    for k in range(k_min, k_max + 1):
-        km = KMeans(n_clusters=k, n_init=N_INIT, random_state=RANDOM_STATE).fit(X)
-        met, _ = metricas_internas(X, km.labels_)
-        filas.append({"K": k, "Inertia": km.inertia_, **(met or {})})
-    return pd.DataFrame(filas)
-
-
-@st.cache_data
-def ajustar_kmeans(X: np.ndarray, k: int):
-    km = KMeans(n_clusters=k, n_init=N_INIT, random_state=RANDOM_STATE).fit(X)
-    return km.labels_, km.cluster_centers_, float(km.inertia_), int(km.n_iter_)
-
-
-@st.cache_data
-def distancias_k(X: np.ndarray, min_samples: int) -> np.ndarray:
-    """Distancia de cada punto a su vecino n.º min_samples (contando el propio punto), ordenada.
-
-    Un punto es núcleo en DBSCAN si esta distancia es <= eps.
-    """
-    vecinos = NearestNeighbors(n_neighbors=min_samples).fit(X)
-    dist, _ = vecinos.kneighbors(X)
-    return np.sort(dist[:, -1])
-
-
-@st.cache_data
-def ajustar_dbscan(X: np.ndarray, eps: float, min_samples: int) -> np.ndarray:
-    return DBSCAN(eps=eps, min_samples=min_samples, metric="euclidean").fit_predict(X)
-
-
-@st.cache_data
-def sensibilidad_dbscan(X: np.ndarray, eps_lista: tuple, ms_lista: tuple) -> pd.DataFrame:
-    filas = []
-    for ms in ms_lista:
-        for eps in eps_lista:
-            labels = ajustar_dbscan(X, eps, ms)
-            n_ruido = int((labels == -1).sum())
-            met, _ = metricas_internas(X, labels)
-            filas.append({
-                "eps": eps,
-                "min_samples": ms,
-                "N.º clústeres": len(set(labels)) - (1 if n_ruido else 0),
-                "N.º ruido": n_ruido,
-                "% ruido": round(100 * n_ruido / len(labels), 1),
-                "Silhouette (sin ruido)": f"{met['Silhouette']:.3f}" if met else "No calculable",
-            })
-    return pd.DataFrame(filas)
-
-
-@st.cache_data
-def proyeccion_2d(X: np.ndarray):
-    """PCA a 2 componentes SOLO para visualizar (el agrupamiento usa todas las variables)."""
-    pca = PCA(n_components=2, random_state=RANDOM_STATE)
-    return pca.fit_transform(X), pca.explained_variance_ratio_, pca
-
-
-def colores_clusters(n: int):
-    cmap = plt.get_cmap("tab10")
-    return [cmap(i % 10) for i in range(n)]
-
-
-def dibujar_heatmap(ax, datos: pd.DataFrame, cmap="vlag", fmt=".2f", centro=0.0):
-    if HAS_SEABORN:
-        sns.heatmap(datos, cmap=cmap, center=centro, annot=True, fmt=fmt, linewidths=0.5,
-                    ax=ax, annot_kws={"size": 8}, cbar_kws={"shrink": 0.8})
-    else:
-        im = ax.imshow(datos.values, cmap="coolwarm", aspect="auto")
-        plt.colorbar(im, ax=ax, shrink=0.8)
-        ax.set_xticks(range(datos.shape[1]))
-        ax.set_xticklabels(datos.columns, rotation=0)
-        ax.set_yticks(range(datos.shape[0]))
-        ax.set_yticklabels(datos.index)
-        for r in range(datos.shape[0]):
-            for c in range(datos.shape[1]):
-                ax.text(c, r, format(datos.iat[r, c], fmt), ha="center", va="center", fontsize=8)
-
-
-def tabla_vs_etiqueta(labels: np.ndarray, nombre: str):
-    """Tabla cruzada clúster vs. etiqueta externa (solo referencia posterior)."""
-    df, etiqueta = obtener_datos()
-    if not etiqueta or etiqueta not in df.columns or len(df) != len(labels):
-        return
-    with st.expander("Contraste posterior con la etiqueta externa (no se usó para agrupar)"):
-        st.caption(
-            "La etiqueta original no interviene en el entrenamiento ni en la elección de parámetros; "
-            "esta tabla solo sirve para verificar si los grupos tienen sentido."
-        )
-        cruce = pd.crosstab(pd.Series(labels, name=nombre), df[etiqueta].reset_index(drop=True).rename(etiqueta))
-        st.dataframe(cruce, width="stretch")
-
-
-# ------------------------------------------------------------------ K-Means
 def pagina_kmeans():
     st.header("🎯 Agrupamiento K-Means")
     X_final, X_raw, vars_x, scaler = matriz_para_clustering()
@@ -886,29 +733,33 @@ def pagina_kmeans():
         st.subheader("Curva del codo y métricas internas por K")
         fig, axes = plt.subplots(2, 2, figsize=(12, 7.5))
         series = [
-            ("Inertia", "Inertia (menor es mejor; siempre decrece)", "#722f37"),
-            ("Silhouette", "Silhouette (mayor es mejor)", "#2e6f40"),
-            ("Davies-Bouldin", "Davies-Bouldin (menor es mejor)", "#003366"),
-            ("Calinski-Harabasz", "Calinski-Harabasz (mayor es mejor)", "#b8860b"),
+            ("Inertia", "Inercia (Método del Codo)\n[Menor es mejor ↓]", "#f43f5e"),
+            ("Silhouette", "Coeficiente Silhouette\n[Mayor es mejor ↑]", "#34d399"),
+            ("Davies-Bouldin", "Índice Davies-Bouldin\n[Menor es mejor ↓]", "#60a5fa"),
+            ("Calinski-Harabasz", "Índice Calinski-Harabasz\n[Mayor es mejor ↑]", "#fbbf24"),
         ]
         for ax, (col, titulo, color) in zip(axes.flatten(), series):
-            ax.plot(tabla_k["K"], tabla_k[col], marker="o", color=color, linewidth=2)
-            ax.axvline(k_sugerido, color="red", linestyle="--", alpha=0.6, label=f"K = {k_sugerido}")
-            ax.set_title(titulo, fontsize=11, fontweight="bold")
-            ax.set_xlabel("Número de clústeres (K)")
+            ax.plot(tabla_k["K"], tabla_k[col], marker="o", color=color, linewidth=2.4, markersize=6.5, label=col)
+            ax.fill_between(tabla_k["K"], tabla_k[col], alpha=0.15, color=color)
+            ax.axvline(k_sugerido, color="#f87171", linestyle="--", alpha=0.85, linewidth=1.5, label=f"K óptimo = {k_sugerido}")
+            val_opt = tabla_k.loc[tabla_k["K"] == k_sugerido, col].values[0]
+            ax.plot(k_sugerido, val_opt, marker="o", markersize=10, color=color, markeredgecolor="#ffffff", markeredgewidth=2)
+            ax.set_title(titulo, fontsize=10.5, fontweight="bold", pad=8)
+            ax.set_xlabel("Número de clústeres (K)", fontsize=9)
             ax.set_xticks(tabla_k["K"])
-            ax.grid(True, linestyle="--", alpha=0.4)
-            ax.legend(fontsize=8)
-        plt.tight_layout()
+            ax.grid(True, linestyle="--", alpha=0.35, color="#2c3345")
+            ax.legend(fontsize=8, loc="best", framealpha=0.7)
+        plt.tight_layout(pad=2.2)
         st.pyplot(fig)
         plt.close(fig)
 
         st.dataframe(
             tabla_k.set_index("K").style.format({
                 "Inertia": "{:.1f}", "Silhouette": "{:.3f}", "Davies-Bouldin": "{:.3f}", "Calinski-Harabasz": "{:.1f}",
-            }).highlight_max(subset=["Silhouette", "Calinski-Harabasz"], color="#c8e6c9")
-              .highlight_min(subset=["Davies-Bouldin"], color="#c8e6c9"),
+            }).highlight_max(subset=["Silhouette", "Calinski-Harabasz"], props="background-color: #1b5e20; color: #ffffff; font-weight: bold;")
+              .highlight_min(subset=["Davies-Bouldin"], props="background-color: #1b5e20; color: #ffffff; font-weight: bold;"),
             width="stretch",
+            height=(len(tabla_k) + 1) * 36 + 10,
         )
         mejores = {
             "Silhouette": int(tabla_k.loc[tabla_k["Silhouette"].idxmax(), "K"]),
@@ -1003,9 +854,9 @@ def pagina_kmeans():
         fig, ax = plt.subplots(figsize=(8, 5.5))
         for i, color in enumerate(colores_clusters(k)):
             m = labels == i
-            ax.scatter(coords[m, 0], coords[m, 1], color=color, edgecolors="black", linewidth=0.4,
-                       alpha=0.8, s=45, label=f"Clúster {i} (n={m.sum()})")
-        ax.scatter(centros_2d[:, 0], centros_2d[:, 1], marker="X", s=250, color="black", label="Centroides")
+            ax.scatter(coords[m, 0], coords[m, 1], color=color, edgecolors="#ffffff", linewidth=0.5,
+                       alpha=0.85, s=50, label=f"Clúster {i} (n={m.sum()})")
+        ax.scatter(centros_2d[:, 0], centros_2d[:, 1], marker="X", s=220, color="#ffffff", edgecolors="#f43f5e", linewidth=1.6, label="Centroides")
         ax.set_xlabel(f"PC1 ({var_exp[0]:.1%} varianza)")
         ax.set_ylabel(f"PC2 ({var_exp[1]:.1%} varianza)")
         ax.set_title(f"K-Means (K = {k}) proyectado en PC1-PC2", fontsize=11, fontweight="bold")
@@ -1061,8 +912,9 @@ def pagina_dbscan():
         kdist = distancias_k(X, min_samples)
         pct_nucleo = 100 * (kdist <= eps).mean()
         fig, ax = plt.subplots(figsize=(9, 4.5))
-        ax.plot(np.arange(1, n + 1), kdist, color="#722f37", linewidth=2)
-        ax.axhline(eps, color="red", linestyle="--", label=f"eps actual = {eps:.2f}")
+        ax.plot(np.arange(1, n + 1), kdist, color="#38bdf8", linewidth=2.4)
+        ax.fill_between(np.arange(1, n + 1), kdist, alpha=0.15, color="#38bdf8")
+        ax.axhline(eps, color="#f43f5e", linestyle="--", linewidth=1.8, label=f"eps actual = {eps:.2f}")
         ax.set_xlabel("Puntos ordenados por distancia")
         ax.set_ylabel(f"Distancia al {min_samples - 1}.º vecino más cercano")
         ax.set_title(f"k-distance (min_samples = {min_samples})", fontsize=11, fontweight="bold")
@@ -1142,12 +994,12 @@ def pagina_dbscan():
         coords, var_exp, _ = proyeccion_2d(X)
         fig, ax = plt.subplots(figsize=(8, 5.5))
         ruido = labels == -1
-        ax.scatter(coords[ruido, 0], coords[ruido, 1], marker="x", color=COLOR_RUIDO, s=45,
+        ax.scatter(coords[ruido, 0], coords[ruido, 1], marker="x", color="#f87171", s=50, linewidth=1.5,
                    label=f"Ruido -1 (n={ruido.sum()})")
         for i, color in enumerate(colores_clusters(n_clusters)):
             m = labels == i
-            ax.scatter(coords[m, 0], coords[m, 1], color=color, edgecolors="black", linewidth=0.4,
-                       alpha=0.85, s=45, label=f"Clúster {i} (n={m.sum()})")
+            ax.scatter(coords[m, 0], coords[m, 1], color=color, edgecolors="#ffffff", linewidth=0.5,
+                       alpha=0.85, s=50, label=f"Clúster {i} (n={m.sum()})")
         ax.set_xlabel(f"PC1 ({var_exp[0]:.1%} varianza)")
         ax.set_ylabel(f"PC2 ({var_exp[1]:.1%} varianza)")
         ax.set_title(f"DBSCAN (eps = {eps:.2f}, min_samples = {min_samples})", fontsize=11, fontweight="bold")
@@ -1198,19 +1050,19 @@ def pagina_pca():
         n_comp = st.slider("Número de componentes a mostrar en el gráfico", 2, 13, 10)
         
         fig, ax1 = plt.subplots(figsize=(9, 4.5))
-        ax1.bar(range(1, n_comp + 1), varianza_exp[:n_comp], alpha=0.7, color="#722f37", label="Varianza Individual")
+        ax1.bar(range(1, n_comp + 1), varianza_exp[:n_comp], alpha=0.75, color="#f43f5e", edgecolor="#ffffff", linewidth=0.5, label="Varianza Individual")
         ax1.set_xlabel("Componente Principal")
-        ax1.set_ylabel("Proporción de Varianza Explicada", color="#722f37")
-        ax1.tick_params(axis='y', labelcolor="#722f37")
+        ax1.set_ylabel("Proporción de Varianza Explicada", color="#f43f5e")
+        ax1.tick_params(axis='y', labelcolor="#f43f5e")
         ax1.set_xticks(range(1, n_comp + 1))
         
         ax2 = ax1.twinx()
-        ax2.plot(range(1, n_comp + 1), varianza_acum[:n_comp], marker="o", color="#003366", linewidth=2, label="Varianza Acumulada")
-        ax2.set_ylabel("Varianza Acumulada", color="#003366")
-        ax2.tick_params(axis='y', labelcolor="#003366")
-        ax2.axhline(0.80, color="gray", linestyle="--", alpha=0.5)
+        ax2.plot(range(1, n_comp + 1), varianza_acum[:n_comp], marker="o", color="#38bdf8", linewidth=2.4, label="Varianza Acumulada")
+        ax2.set_ylabel("Varianza Acumulada", color="#38bdf8")
+        ax2.tick_params(axis='y', labelcolor="#38bdf8")
+        ax2.axhline(0.80, color="#94a3b8", linestyle="--", alpha=0.6, label="Umbral 80%")
         
-        fig.suptitle("Scree Plot: Varianza por Componente", fontweight="bold")
+        fig.suptitle("Scree Plot: Varianza por Componente", fontweight="bold", color="#f0f2f6")
         st.pyplot(fig)
         plt.close(fig)
 
@@ -1257,15 +1109,15 @@ def pagina_pca():
         components = pca_full.components_[:2]
         
         fig, ax = plt.subplots(figsize=(8.5, 5.5))
-        ax.scatter(coords[:, 0], coords[:, 1], c="#bbbbbb", alpha=0.6, edgecolors="#777777", linewidths=0.5, s=40, label="Muestras de vino")
+        ax.scatter(coords[:, 0], coords[:, 1], c="#94a3b8", alpha=0.65, edgecolors="#ffffff", linewidths=0.4, s=45, label="Muestras de vino")
         
         for i, col in enumerate(vars_x):
             x_arr = components[0, i] * scale_arrows
             y_arr = components[1, i] * scale_arrows
             ax.annotate("", xy=(x_arr, y_arr), xytext=(0, 0),
-                        arrowprops=dict(arrowstyle="->", color="#800020", lw=1.5, mutation_scale=12))
-            ax.text(x_arr * 1.05, y_arr * 1.05, col, fontsize=8, fontweight="bold", color="#1a1a1a",
-                    bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="#cccccc", alpha=0.8))
+                        arrowprops=dict(arrowstyle="->", color="#f43f5e", lw=1.8, mutation_scale=14))
+            ax.text(x_arr * 1.05, y_arr * 1.05, col, fontsize=8, fontweight="bold", color="#f1f5f9",
+                    bbox=dict(boxstyle="round,pad=0.25", facecolor="#1e2230", edgecolor="#3b4256", alpha=0.9))
                     
         ax.axhline(0, color="gray", linestyle=":", linewidth=0.8)
         ax.axvline(0, color="gray", linestyle=":", linewidth=0.8)
@@ -1602,6 +1454,93 @@ Tema: Descubrimiento de patrones fisicoquímicos en vinos (K-Means, DBSCAN y PCA
         )
 
 
+def renderizar_encabezado_stepper(seccion_actual: str):
+    """Renderiza el Stepper del Pipeline en la parte superior con barra compacta de 9 tarjetas en fila (Opción B)."""
+    idx = SECCIONES.index(seccion_actual) if seccion_actual in SECCIONES else 0
+    total = len(SECCIONES)
+    pct = int(((idx + 1) / total) * 100)
+
+    st.markdown(
+        f"""
+        <div style="margin-bottom: 8px; padding: 8px 14px; background: rgba(244, 63, 94, 0.05); border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                <span style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #f43f5e;">
+                    🧪 Pipeline de Machine Learning · Fase {idx + 1} de {total}: <span style="color: #ffffff;">{seccion_actual}</span>
+                </span>
+                <span style="font-size: 0.8rem; font-weight: 700; color: #f0f2f6;">
+                    {pct}% Completado
+                </span>
+            </div>
+            <div style="width: 100%; height: 5px; background: rgba(255, 255, 255, 0.08); border-radius: 10px; overflow: hidden;">
+                <div style="width: {pct}%; height: 100%; background: linear-gradient(90deg, #f43f5e 0%, #be123c 50%, #38bdf8 100%); border-radius: 10px; transition: width 0.35s ease;"></div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    pasos = [
+        ("Inicio", "01", "🏠", "Inicio"),
+        ("Datos", "02", "📁", "Datos"),
+        ("EDA", "03", "📊", "EDA"),
+        ("Preprocesamiento", "04", "⚖️", "Escala"),
+        ("K-Means", "05", "🔴", "K-Means"),
+        ("DBSCAN", "06", "🔵", "DBSCAN"),
+        ("PCA", "07", "📉", "PCA"),
+        ("Comparación", "08", "⚖️", "Comparar"),
+        ("Conclusiones", "09", "📑", "Conclusión"),
+    ]
+
+    cols = st.columns(9, gap="small")
+    for col, (key, num, icon, label) in zip(cols, pasos):
+        with col:
+            p_idx = SECCIONES.index(key) if key in SECCIONES else 0
+            is_active = (key == seccion_actual)
+            is_done = (p_idx < idx)
+
+            if is_active:
+                btn_text = f"● {num} {icon} {label}"
+                btn_type = "primary"
+            elif is_done:
+                btn_text = f"✓ {num} {icon} {label}"
+                btn_type = "secondary"
+            else:
+                btn_text = f"{num} {icon} {label}"
+                btn_type = "secondary"
+
+            if st.button(btn_text, key=f"bar_step_{key}", use_container_width=True, type=btn_type):
+                st.session_state["seccion_activa"] = key
+                st.rerun()
+
+
+def renderizar_botones_flotantes_laterales(seccion_actual: str):
+    """Renderiza botones de navegación flotantes discretos (< y >) en los laterales."""
+    idx = SECCIONES.index(seccion_actual) if seccion_actual in SECCIONES else 0
+    total = len(SECCIONES)
+
+    col_fl, col_fr = st.columns([1, 1])
+
+    with col_fl:
+        if idx > 0:
+            anterior = SECCIONES[idx - 1]
+            if st.button("❮", key="btn_flotante_prev", help=f"Anterior: {anterior}"):
+                st.session_state["seccion_activa"] = anterior
+                st.rerun()
+
+    with col_fr:
+        if idx < total - 1:
+            siguiente = SECCIONES[idx + 1]
+            if st.button("❯", key="btn_flotante_next", help=f"Siguiente: {siguiente}"):
+                st.session_state["seccion_activa"] = siguiente
+                st.rerun()
+        else:
+            if st.button("↺", key="btn_flotante_next", help="Reiniciar al Inicio"):
+                st.session_state["seccion_activa"] = "Inicio"
+                st.rerun()
+
+
+
+
 # ------------------------------------------------------------------ Main
 PAGINAS = {
     "Inicio": pagina_inicio,
@@ -1615,6 +1554,39 @@ PAGINAS = {
     "Conclusiones": pagina_conclusiones,
 }
 
+if "seccion_activa" not in st.session_state:
+    st.session_state["seccion_activa"] = "Inicio"
+
+# Barra lateral sincronizada automáticamente (cumple la rúbrica docente)
 st.sidebar.title("🍷 Navegación")
-seccion = st.sidebar.radio("Sección", SECCIONES, label_visibility="collapsed")
-PAGINAS.get(seccion, lambda: en_construccion(seccion))()
+idx_sidebar = SECCIONES.index(st.session_state["seccion_activa"]) if st.session_state["seccion_activa"] in SECCIONES else 0
+seccion_sidebar = st.sidebar.radio(
+    "Sección",
+    SECCIONES,
+    index=idx_sidebar,
+    label_visibility="collapsed",
+)
+if seccion_sidebar != st.session_state["seccion_activa"]:
+    st.session_state["seccion_activa"] = seccion_sidebar
+    st.rerun()
+
+# 1. Stepper del Pipeline en la parte superior (Cuadrícula 3x3 por etapas)
+renderizar_encabezado_stepper(st.session_state["seccion_activa"])
+st.write("")
+
+# 2. Botones de navegación flotantes laterales (a mitad de pantalla)
+renderizar_botones_flotantes_laterales(st.session_state["seccion_activa"])
+
+# 3. Renderizar la sección activa (sin alterar ningún gráfico ni tabla)
+PAGINAS.get(st.session_state["seccion_activa"], lambda: en_construccion(st.session_state["seccion_activa"]))()
+
+# Pie de página sutil
+st.markdown(
+    """
+    <div style="text-align: center; margin-top: 45px; padding: 18px 0; color: #64748b; font-size: 0.76rem; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+        🍷 Descubrimiento de Patrones Fisicoquímicos en Vinos · Sistemas Inteligentes y Machine Learning · Grupo 03
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
