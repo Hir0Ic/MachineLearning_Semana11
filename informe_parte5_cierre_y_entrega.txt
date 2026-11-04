@@ -1,0 +1,229 @@
+================================================================================
+SISTEMAS INTELIGENTES Y MACHINE LEARNING · GRUPO 03 · UPN
+PROYECTO: DESCUBRIMIENTO DE PATRONES FISICOQUÍMICOS EN VINOS (K-MEANS, DBSCAN, PCA)
+DOCUMENTO DE APOYO PARA EL INFORME (WORD) - PARTE 5: CIERRE Y ENTREGA
+================================================================================
+
+CONTENIDO DE ESTE DOCUMENTO:
+- RESUMEN FINAL (ABSTRACT EJECUTIVO)
+- 4.5 GUÍA DE CAPTURAS DE STREAMLIT Y PIES DE FIGURA (APA 7)
+- 5. DISCUSIÓN CRÍTICA Y METODOLÓGICA (K-MEANS VS. DBSCAN VS. PCA)
+- 6. CONCLUSIONES (5), LIMITACIONES (3) Y RECOMENDACIONES (3)
+- 7. REFERENCIAS BIBLIOGRÁFICAS (NORMA APA 7)
+- 8. ANEXOS (MATRIZ DE PARTICIPACIÓN Y GUÍA TÉCNICA)
+
+================================================================================
+RESUMEN FINAL (ABSTRACT EJECUTIVO)
+================================================================================
+El presente estudio abordó el descubrimiento no supervisado de patrones fisicoquímicos en una colección de 178 muestras de vino procedentes de tres cultivares italianos (Dataset Wine de UCI, Aeberhard & Forina, 1992), empleando 13 variables cuantitativas (12 continuas y 1 entera: magnesium). Siguiendo un estricto protocolo de aprendizaje no supervisado, la variable de clase original fue completamente excluida de las etapas de optimización y ajuste. Tras un análisis exploratorio exhaustivo (EDA) que constató la ausencia de valores nulos o duplicados y una marcada disparidad en las magnitudes de las variables (con rangos entre 0.53 y 1,402.0), se implementó una estandarización basada en Z-Score (StandardScaler) para garantizar la isometría del espacio euclídeo.
+
+Posteriormente, se comparó el desempeño del agrupamiento particional con K-Means frente al agrupamiento basado en densidad con DBSCAN, utilizando el Análisis de Componentes Principales (PCA) para la reducción de dimensionalidad y la proyección geométrica en 2D. K-Means identificó una partición óptima en K = 3 (Inertia = 1,277.9; Silhouette = 0.285; Davies-Bouldin = 1.389; Calinski-Harabasz = 70.9), asignando el 100% de las observaciones a tres perfiles químicos distintivos: vinos de alta graduación y concentración de prolina (Clúster 0), vinos con menor tenor alcohólico y mayor alcalinidad de cenizas (Clúster 1), y vinos con bajo contenido en flavonoides y elevada acidez málica (Clúster 2). Por su parte, DBSCAN (calibrado con eps = 2.30 y min_samples = 5 mediante el gráfico k-distance) aisló dos núcleos densos y detectó 42 muestras de ruido (23.6%), de las cuales 13 coincidieron con muestras que presentaban valores atípicos de Tukey en el EDA (13/42 = 31.0%), mientras que las 29 restantes correspondieron a observaciones en regiones hiperdimensionales de baja densidad o de transición entre cultivares. PCA reveló que tres componentes principales sintetizan el 66.5% de la varianza total (PC1: 36.2% dominado por flavonoides; PC2: 19.2% dominado por color (+0.530), alcohol (+0.484) y prolina (+0.365); PC3: 11.1% dominado por cenizas), confirmando la redundancia y colinealidad de los atributos. Se concluye que K-Means es la metodología idónea para la segmentación comercial y categorización de inventario, mientras que DBSCAN funge como un eficaz mecanismo de control de calidad y detección de lotes anómalos en laboratorio enológico.
+
+Palabras clave: Aprendizaje no supervisado, K-Means, DBSCAN, PCA, Clustering, Enología, Quimiometría.
+
+================================================================================
+4.5 GUÍA DE CAPTURAS DE STREAMLIT PARA EL INFORME (WORD)
+================================================================================
+
+A continuación se detalla la lista de figuras generadas desde la aplicación Streamlit para ser insertadas en el documento final, junto con sus respectivos pies de figura en formato APA 7:
+
+>> FIGURA 1 (Sección EDA - Distribuciones):
+Ruta en la app: Sección "EDA" -> Pestaña "3. Distribuciones" -> "Ver todas en cuadrícula".
+Archivo listo: imagenes_informe/figura_1_histogramas_distribucion.png
+Pie de figura:
+Figura 1. Cuadrícula de histogramas y curvas de densidad KDE de las 13 variables fisicoquímicas del conjunto de datos Wine. Se aprecian distribuciones bimodales en flavonoides y fenoles totales, y asimetría positiva en magnesio y ácido málico.
+
+>> FIGURA 2 (Sección EDA - Outliers):
+Ruta en la app: Sección "EDA" -> Pestaña "4. Outliers".
+Archivo listo: imagenes_informe/figura_2_boxplots_outliers.png
+Pie de figura:
+Figura 2. Diagramas de caja (Boxplots) y cuantificación de valores atípicos bajo el criterio de Tukey (1.5 × IQR). Se identifican anomalías leves en 7 de las 13 variables químicas, representando menos del 2.5% de las observaciones.
+
+>> FIGURA 3 (Sección EDA - Correlación):
+Ruta en la app: Sección "EDA" -> Pestaña "5. Matriz de Correlación".
+Archivo listo: imagenes_informe/figura_3_matriz_correlacion.png y figura_5_dispersion_fenoles_y_prolina.png
+Pie de figura:
+Figura 3. Matriz de correlación lineal de Pearson y diagramas de dispersión bivariada. Destaca la fuerte asociación lineal positiva entre fenoles totales y flavonoides (r = +0.865), y entre grado alcohólico y prolina (r = +0.644).
+
+>> FIGURA 4 (Sección Preprocesamiento - Escalado):
+Ruta en la app: Sección "Preprocesamiento" -> Pestaña "Comparativa Visual de Distribución".
+Archivo listo: imagenes_informe/figura_4_comparacion_escaladores.png
+Pie de figura:
+Figura 4. Comparativa de diagramas de caja horizontales: escala original heterogénea frente a las transformaciones por StandardScaler (Z-Score) y RobustScaler (IQR).
+
+>> FIGURA 5 (Sección K-Means - Selección de K y Métricas):
+Ruta en la app: Sección "K-Means" -> Pestaña "1. Selección de K".
+Pie de figura:
+Figura 5. Curvas de evaluación para K-Means de K = 2 a 10. La inercia presenta su punto de inflexión ("codo") en K = 3, coincidiendo con el máximo global del coeficiente de Silhouette (0.285) y el óptimo de Davies-Bouldin (1.389).
+
+>> FIGURA 6 (Sección K-Means - Proyección 2D y Centroides):
+Ruta en la app: Sección "K-Means" -> Pestaña "4. Visualización".
+Pie de figura:
+Figura 6. Proyección bidimensional sobre PC1 y PC2 de los tres clústeres obtenidos por K-Means, con los centroides multivariados representados mediante marcadores destacados ("X").
+
+>> FIGURA 7 (Sección DBSCAN - k-distance y Dispersión con Ruido):
+Ruta en la app: Sección "DBSCAN" -> Pestañas "1. Gráfico k-distance" y "4. Visualización y perfil".
+Pie de figura:
+Figura 7. Calibración del radio eps mediante la curva k-distance (min_samples = 5) y proyección espacial de los dos clústeres densos identificados, resaltando 42 muestras clasificadas como ruido analítico (-1).
+
+>> FIGURA 8 (Sección PCA - Scree Plot y Biplot):
+Ruta en la app: Sección "PCA" -> Pestañas "1. Varianza Explicada" y "3. Biplot (Vectores)".
+Pie de figura:
+Figura 8. Análisis de Componentes Principales: Scree Plot de varianza explicada acumulada (66.5% en 3 componentes) y Biplot factorial que proyecta las cargas de las 13 variables químicas en el plano PC1-PC2.
+
+>> FIGURA 9 (Sección Comparación - Tabla y Barras Comparativas):
+Ruta en la app: Sección "Comparación".
+Pie de figura:
+Figura 9. Panel comparativo de métricas de calidad y distribución de muestras entre K-Means y DBSCAN. K-Means alcanza una cobertura del 100%, mientras que DBSCAN discrimina un 23.6% de muestras disolutas.
+
+
+>> FIGURA 13 (Captura: Sección K-Means con control deslizante de K):
+Ruta en la app: Sección "K-Means" -> Pestaña "2. Modelo y métricas".
+Archivo listo: imagenes_informe/figura_13_captura_kmeans_slider.png
+Pie de figura:
+Figura 13. Captura: sección K-Means con control deslizante de K (K = 2 a 10). Se aprecia el ajuste dinámico en K = 3 junto con las tarjetas de métricas (Inertia, Silhouette, Davies-Bouldin y Calinski-Harabasz) y el desglose de muestras.
+
+>> FIGURA 14 (Captura: Proyección PC1-PC2 de clústeres K-Means con centroides):
+Ruta en la app: Sección "K-Means" -> Pestaña "4. Visualización".
+Archivo listo: imagenes_informe/figura_14_captura_kmeans_pc1_pc2_centroides.png
+Pie de figura:
+Figura 14. Captura: proyección PC1-PC2 de los clústeres de K-Means con sus centroides. Se evidencia la separación geométrica tricolor y la localización de los centroides multivariados marcados con "X".
+
+>> FIGURA 15 (Captura: Sección DBSCAN con controles de eps y min_samples):
+Ruta en la app: Sección "DBSCAN" -> Pestaña "2. Modelo y métricas".
+Archivo listo: imagenes_informe/figura_15_captura_dbscan_controles_eps.png
+Pie de figura:
+Figura 15. Captura: sección DBSCAN con controles de eps y min_samples. Se muestran los deslizadores interactivos calibrados en eps = 2.30 y min_samples = 5, destacando la cuantificación de los 2 clústeres densos y el 23.6% de ruido (-1).
+
+>> FIGURA 16 (Captura: Sección PCA con varianza explicada y biplot):
+Ruta en la app: Sección "PCA" -> Pestañas "1. Varianza Explicada" y "3. Biplot (Vectores)".
+Archivo listo: imagenes_informe/figura_16_captura_pca_varianza_biplot.png
+Pie de figura:
+Figura 16. Captura: sección PCA con varianza explicada y biplot. Se observa el Scree Plot con la curva de varianza acumulada (80% alcanzado con 5 componentes) y el biplot factorial con los vectores directores de las cargas químicas.
+
+>> FIGURA 17 (Captura: Sección Comparación con métricas y descarga de etiquetas):
+Ruta en la app: Sección "Comparación".
+Archivo listo: imagenes_informe/figura_17_captura_comparacion_metricas_descarga.png
+Pie de figura:
+Figura 17. Captura: sección Comparación con métricas de K-Means y DBSCAN y descarga de etiquetas. Incluye la tabla de contraste metodológico y el botón de exportación del CSV con las etiquetas asignadas.
+
+>> FIGURA 18 (Captura: Manejo de errores de la aplicación):
+Ruta en la app: Secciones "K-Means" y "DBSCAN" bajo condiciones de borde.
+Archivo listo: imagenes_informe/figura_18_captura_manejo_errores.png
+Pie de figura:
+Figura 18. Captura: manejo de errores de la aplicación (K mayor que n y métricas no calculables). Demuestra la robustez del sistema ante casos de fallo, impidiendo la interrupción del servicio mediante mensajes de advertencia controlados.
+
+================================================================================
+5. DISCUSIÓN CRÍTICA Y METODOLÓGICA
+================================================================================
+
+5.1 Contraste Geométrico y Teórico: K-Means frente a DBSCAN
+La evaluación experimental evidencia profundas divergencias conceptuales entre el paradigma particional y el basado en densidad:
+- K-Means opera bajo el supuesto de que el espacio está formado por hiper-esferas conexas y convexas con densidades homogéneas. Esto lo obliga a asignar absolutamente todas las 178 observaciones a uno de los K centroides, independientemente de qué tan alejada se encuentre una muestra. Si bien esto resulta ideal para estructurar un catálogo comercial donde ninguna botella puede quedar sin categoría, presenta la desventaja teórica de absorber observaciones espurias o defectuosas dentro de los promedios de los grupos.
+- DBSCAN, en contraposición, concibe los clústeres como regiones densas delimitadas por regiones de baja densidad. Esta formulación le confirió la capacidad única de identificar 42 muestras como "ruido" (-1), que en el contexto enológico corresponden a vinos atípicos con alta acidez málica, exceso de cenizas o desbalances de magnesio detectados previamente en el EDA. Al depurar este 23.6% de dispersión residual, los dos clústeres densos que DBSCAN conserva alcanzan una Silhouette de 0.331 (Davies-Bouldin de 1.182 y Calinski-Harabasz de 70.5), aunque a expensas de sacrificar la cobertura total del lote.
+
+5.2 El Papel de PCA como Puente Dimensional y de Diagnóstico
+El Análisis de Componentes Principales demostró que el espacio de 13 variables contiene una sustancial redundancia fisicoquímica:
+- La primera componente principal (PC1, 36.2% de varianza) actúa como un "eje de calidad fenólica", dominado por las cargas positivas de flavonoides (+0.42), fenoles totales (+0.39) y od280/od315 (+0.38), y cargas negativas de alcalinidad de cenizas (-0.24).
+- La segunda componente principal (PC2, 19.2% de varianza) actúa como un "eje de maduración alcohólica y color", liderado por la intensidad del color (+0.530), alcohol (+0.484) y prolina (+0.365).
+- Cabe señalar que las dos primeras componentes retienen el 55.4% de la varianza total (dejando fuera el 44.6%), mientras que tres componentes alcanzan el 66.5% (dejando fuera el 33.5%), lo que provee una síntesis visual interpretable aunque condicionada por la pérdida de un tercio de la variabilidad.
+
+5.3 Relevancia para la Toma de Decisiones en la Industria Vitivinícola
+Desde una perspectiva de ingeniería aplicada y ciencia de datos enológica:
+- El clustering no supervisado demuestra que la química del vino se auto-organiza en tres grandes categorías comerciales sin necesidad de conocer la etiqueta de origen.
+- La combinación de modelos genera una sinergia operativa: DBSCAN funciona como una herramienta de primer nivel de control de calidad en bodega (detectando lotes con perfiles composicionales atípicos), mientras que K-Means actúa en la etapa logística posterior, clasificando los lotes conformes en líneas de embotellado (líneas de embotellado o perfiles químicos).
+
+================================================================================
+6. CONCLUSIONES, LIMITACIONES Y RECOMENDACIONES
+================================================================================
+
+6.1 Cinco (5) Conclusiones Centrales con Sustento Cuantitativo
+--------------------------------------------------------------------------------
+1. Identificación de una estructura natural tripartita:
+   Tanto el método del codo (Inertia = 1,277.9) como la maximización del coeficiente de Silhouette (máximo global en K = 3 con 0.285) y la minimización del índice de Davies-Bouldin (1.389) corroboraron de manera puramente no supervisada la presencia de tres perfiles químicos naturales en el conjunto de 178 muestras, con un solapamiento inter-clúster moderado (Silhouette = 0.285) donde 172 de las 178 muestras (96.6%) quedaron asignadas en correspondencia con el cultivar agronómico dominante de cada grupo (59/59 en cultivar 0, 65/71 en cultivar 1 y 48/48 en cultivar 2).
+
+2. Reducción y síntesis dimensional fidedigna mediante PCA:
+   Se demostró una alta redundancia en el espacio original de 13 dimensiones. Los dos primeros componentes principales retienen el 55.4% de la varianza total (PC1 con 36.2% y PC2 con 19.2%), mientras que un modelo tridimensional alcanza el 66.5%. Esta compresión ortogonal facilitó la visualización sin introducir distorsiones severas en la relación de distancias relativas.
+
+3. Detección y aislamiento sistemático de anomalías con DBSCAN:
+   La calibración de DBSCAN (eps = 2.30, min_samples = 5) identificó 42 muestras clasificadas como ruido (-1) (23.6%). De las 17 muestras que presentaron algún valor atípico univariado de Tukey en el EDA, 13 fueron capturadas como ruido por DBSCAN (76.5% de los atípicos). Las otras 29 muestras de ruido corresponden a puntos situados en regiones hiperdimensionales de baja densidad o de frontera entre grupos.
+
+4. Necesidad ineludible de estandarización multivariada:
+   Se comprobó cuantitativamente que la escala original de los datos estaba dominada por la variable prolina (rango de 1,402.0 y desviación estándar de 314.91) frente a compuestos traza como fenoles no flavonoides (rango de 0.53 y desviación de 0.12). La estandarización Z-Score (StandardScaler, media = 0, varianza = 1) equilibró las dimensiones e impidió que una sola variable dominara desproporcionadamente la suma de cuadrados de distancias euclídeas frente a compuestos traza como fenoles no flavonoides (rango 0.53).
+
+5. Complementariedad metodológica orientada a la cadena de valor:
+   La comparativa evidenció que K-Means y DBSCAN resuelven problemas comerciales distintos y complementarios. K-Means es la solución óptima para la catalogación y segmentación exhaustiva del 100% de los lotes vinícolas, mientras que DBSCAN se posiciona como el estándar para la detección de anomalías y aseguramiento de calidad analítica en laboratorio.
+
+6.2 Tres (3) Limitaciones Técnicas del Estudio
+--------------------------------------------------------------------------------
+1. Restricción de esfericidad geométrica en K-Means:
+   El algoritmo presupone particiones convexas y simétricas, lo que genera una asignación rígida y forzada de las observaciones perimetrales. Muestras situadas en zonas de solapamiento entre perfiles son adjudicadas a un centroide sin reflejar el grado de incertidumbre enológica de la transición.
+
+2. Alta sensibilidad paramétrica de DBSCAN en espacios continuos:
+   En un espacio hiperdimensional de 13 características, las distancias euclídeas tienden a dispersarse (maldición de la dimensionalidad). Como consecuencia, variaciones sutiles en el radio eps alteran notablemente el resultado: con min_samples = 5, eps = 2.2 produce 30.9% de ruido (2 clústeres), eps = 2.3 produce 23.6% de ruido (2 clústeres), eps = 2.4 produce 20.2% de ruido (2 clústeres), y eps = 2.5 produce 13.5% de ruido colapsando las muestras densas en un único macroclúster.
+
+3. Restricción del dominio muestral:
+   El estudio se basa en un dataset histórico de 178 muestras circunscritas a una micro-región italiana específica. Los umbrales exactos de corte químico (como concentraciones de prolina > 1,000) no son directamente generalizables a vinos producidos en otras latitudes o con procesos enológicos modernos sin un nuevo calibrado del modelo.
+
+6.3 Tres (3) Recomendaciones Prácticas y Futuras
+--------------------------------------------------------------------------------
+1. Adopción de una arquitectura de Machine Learning en cascada:
+   Se recomienda estructurar el pipeline de planta en dos etapas secuenciales: filtrar inicialmente los lotes cosechados con DBSCAN para detectar defectos o adulteraciones, y posteriormente aplicar K-Means (K=3) sobre las muestras conformes para clasificarlas en sus líneas comerciales de producto final.
+
+2. Aplicación de clustering sobre el espacio proyectado de PCA:
+   Para acelerar el entrenamiento y robustecer los algoritmos basados en densidad, se sugiere ejecutar DBSCAN sobre las coordenadas de las tres primeras componentes principales de PCA (PC1, PC2 y PC3), eliminando las dimensiones residuales que actúan como ruido aleatorio.
+
+3. Integración de variables organolépticas y climáticas:
+   Enriquecer la matriz de características incorporando puntuaciones sensoriales de paneles de cata certificados (notas de cata, acidez percibida, astringencia tánica) y datos meteorológicos de la añada (insolación acumulada, pluviometría), cerrando la brecha entre la analítica instrumental y la experiencia del consumidor.
+
+================================================================================
+7. REFERENCIAS BIBLIOGRÁFICAS (FORMATO APA 7)
+================================================================================
+
+Aeberhard, S., & Forina, M. (1992). Wine [Dataset]. UCI Machine Learning Repository. 
+    https://doi.org/10.24432/C5PC7J
+
+Ester, M., Kriegel, H. P., Sander, J., & Xu, X. (1996). A density-based algorithm 
+    for discovering clusters in large spatial databases with noise. En Proceedings 
+    of the Second International Conference on Knowledge Discovery and Data Mining (KDD-96) 
+    (pp. 226-231). AAAI Press.
+
+Jolliffe, I. T., & Cadima, J. (2016). Principal component analysis: A review and recent 
+    developments. Philosophical Transactions of the Royal Society A: Mathematical, 
+    Physical and Engineering Sciences, 374(2065), 20150202. https://doi.org/10.1098/rsta.2015.0202
+
+MacQueen, J. (1967). Some methods for classification and analysis of multivariate observations. 
+    En Proceedings of the Fifth Berkeley Symposium on Mathematical Statistics and 
+    Probability (Vol. 1, pp. 281-297). University of California Press.
+
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., 
+    Blondel, M., Prettenhofer, P., Weiss, R., Dubourg, V., Vanderplas, J., Passos, A., 
+    Cournapeau, D., Brucher, M., Perrot, M., & Duchesnay, É. (2011). Scikit-learn: 
+    Machine learning in Python. Journal of Machine Learning Research, 12, 2825-2830.
+
+Rousseeuw, P. J. (1987). Silhouettes: A graphical aid to the interpretation and validation 
+    of cluster analysis. Journal of Computational and Applied Mathematics, 20, 53-65. 
+    https://doi.org/10.1016/0377-0427(87)90125-7
+
+================================================================================
+8. ANEXOS
+================================================================================
+
+8.1 Matriz de Participación y Roles del Equipo (Grupo 03 - UPN)
+--------------------------------------------------------------------------------
+Parte 1: Formulación del problema, introducción, fundamentos teóricos y estructura base.
+Parte 2: Auditoría de calidad de datos, Análisis Exploratorio (EDA) y Preprocesamiento multivariado.
+Parte 3: Implementación y optimización de K-Means (K=2 a 10) y DBSCAN (k-distance y ruido).
+Parte 4: Reducción de dimensionalidad con PCA, Biplot factorial y Comparativa metodológica.
+Parte 5: Integración final de la aplicación, control de errores, discusión crítica, conclusiones y entrega.
+
+8.2 Verificación de Requisitos Técnicos
+- Sistema operativo: Compatible con Windows, Linux y macOS.
+- Lenguaje: Python 3.12.
+- Dependencias: Streamlit, Pandas, NumPy, Scikit-Learn, Matplotlib, Seaborn.
+- Estado de ejecución: Ejecución limpia, sin errores de ejecución.
+
+================================================================================
+FIN DEL DOCUMENTO DE PARTE 5
+================================================================================
+
