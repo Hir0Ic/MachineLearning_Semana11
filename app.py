@@ -81,29 +81,292 @@ aplicar_estilos_ui()
 
 # ---------------------------------------------------------------- Inicio
 def pagina_inicio():
-    st.title("🍷 Descubrimiento de patrones fisicoquímicos en vinos")
-    st.caption("K-Means, DBSCAN y PCA · Sistemas Inteligentes y Machine Learning · Grupo 03")
+    # 1. Hero Banner Institucional (Universidad, Carrera y Proyecto)
     st.markdown(
         """
-        **Pregunta central:** ¿qué patrones o segmentos se pueden descubrir en los datos
-        y qué evidencia demuestra que los resultados son interpretables y útiles?
+        <div style="background: linear-gradient(135deg, rgba(244,63,94,0.12) 0%, rgba(22,25,34,0.85) 100%);
+                    border: 1px solid rgba(244,63,94,0.3); border-radius: 14px; padding: 22px 26px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+            <span style="font-size: 0.82rem; font-weight: 700; color: #f43f5e; text-transform: uppercase; letter-spacing: 0.08em;">
+              🏛️ Universidad Privada del Norte · Facultad de Ingeniería
+            </span>
+            <span style="background: rgba(244,63,94,0.18); color: #f43f5e; padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; border: 1px solid rgba(244,63,94,0.35);">
+              GRUPO 03 · APRENDIZAJE NO SUPERVISADO
+            </span>
+          </div>
+          <h1 style="margin: 4px 0 8px 0; font-size: 2rem; font-weight: 800; color: #ffffff; letter-spacing: -0.02em;">
+            🍷 Descubrimiento de Patrones Fisicoquímicos en Vinos
+          </h1>
+          <p style="font-size: 1.02rem; color: #cbd5e1; margin: 0; line-height: 1.55;">
+            Modelado no supervisado con <strong>K-Means</strong>, <strong>DBSCAN</strong> y <strong>PCA</strong> sobre el dataset <em>Wine (UCI)</em>.<br>
+            <span style="color: #94a3b8; font-size: 0.92rem;">
+              Sistemas Inteligentes y Machine Learning · Ingeniería de Sistemas · 2026
+            </span>
+          </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-        Esta aplicación permite cargar los datos, explorarlos, prepararlos y comparar
-        agrupamientos obtenidos con **K-Means** y **DBSCAN**, usando **PCA** para reducir
-        la dimensionalidad y visualizar los resultados. La etiqueta original del dataset
-        **no** se usa para formar los grupos.
-        """
-    )
-    st.subheader("Cómo usar la aplicación")
-    st.markdown(
-        "1. Ve a **Datos** y elige el dataset Wine o sube tu propio archivo.\n"
-        "2. Recorre las secciones en orden desde la barra lateral."
-    )
+
+
+    # 3. Métricas Rápidas del Estudio (KPIs de Introducción)
     df, _ = obtener_datos()
-    if df is None:
-        st.warning("Aún no hay datos cargados. Ve a la sección **Datos**.")
-    else:
-        st.success(f"Datos cargados: {df.shape[0]} registros y {df.shape[1]} columnas.")
+    n_muestras = df.shape[0] if df is not None else 178
+    n_vars = (df.shape[1] - 1) if df is not None and "target" in df.columns else 13
+
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    kpi1.metric("Muestras de Vino", f"{n_muestras}", "Unidades de análisis")
+    kpi2.metric("Variables Químicas", f"{n_vars}", "Predictoras continuas")
+    kpi3.metric("Cultivares (Target)", "3", "Excluidos de la matriz X")
+    kpi4.metric("Calidad de Datos", "100 %", "0 nulos y 0 duplicados")
+
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
+    # 4. Pestañas de la Sección 1 (Informe y Diapositivas)
+    tab_preg, tab_obj, tab_lim = st.tabs([
+        "🎯 1. Pregunta Central y Contexto",
+        "📌 2. Objetivos del Proyecto",
+        "🔬 3. Unidad de Análisis y Límites",
+    ])
+
+    with tab_preg:
+        st.subheader("Contexto y Pregunta de Análisis")
+        st.markdown(
+            """
+            Los viñedos y laboratorios enológicos generan información química abundante sobre cada muestra de vino, pero rara vez cuentan con una clasificación confiable que indique qué perfiles existen realmente en ella. Un laboratorio desea identificar perfiles de muestras a partir de indicadores químicos (alcohol, fenoles, color, prolina, entre otros), sin usar las clases de referencia para formar los grupos. 
+
+            Para ello se utilizó el dataset Wine del UCI Machine Learning Repository (Aeberhard & Forina, 1992), que reúne 178 muestras de vinos italianos descritas por 13 constituyentes químicos. Sobre estos datos se aplican K-Means y DBSCAN para el agrupamiento, y PCA para reducir la dimensionalidad y visualizar los resultados, todo integrado en una aplicación web desarrollada en Streamlit.
+            """
+        )
+        st.info(
+            "❓ **Pregunta central:** ¿qué patrones o segmentos se pueden descubrir en los datos y qué evidencia demuestra que los resultados son interpretables y útiles?"
+        )
+        st.markdown("---")
+        st.markdown("**🔬 1.3 Preguntas de Investigación del Informe (Desglose Interactivo):**")
+        st.caption("Selecciona una pregunta de investigación en el menú desplegable para ver su respuesta analítica:")
+
+        preguntas_lista = [
+            "1. ¿Cuáles variables caracterizan la separación de grupos?",
+            "2. ¿Cuánta varianza conservan dos y tres componentes principales?",
+            "3. ¿Coinciden o divergen los resultados de K-Means y DBSCAN?",
+            "📋 Ver las 3 preguntas desglosadas (Vista Completa)",
+        ]
+
+        pregunta_sel = st.selectbox(
+            "Selecciona una pregunta de investigación:",
+            preguntas_lista,
+            label_visibility="collapsed",
+        )
+
+        def _render_resp_1():
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.75); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 18px 20px; margin-top: 10px; margin-bottom: 12px;">
+                  <div style="color: #38bdf8; font-weight: 800; font-size: 1.02rem; margin-bottom: 8px;">
+                    🍇 Respuesta a la Pregunta 1: Variables que caracterizan la separación de grupos
+                  </div>
+                  <p style="color: #e2e8f0; font-size: 0.92rem; line-height: 1.55; margin-bottom: 10px;">
+                    La separación de los perfiles químicos está dominada principalmente por dos bloques moleculares complementarios y un aminoácido estructural:
+                  </p>
+                  <ul style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.6; margin-bottom: 12px;">
+                    <li><strong>Bloque Fenólico y Antioxidante (PC1):</strong> <code>flavanoids</code> (rango 0.34 a 5.08), <code>total_phenols</code> y la absorbancia <code>od280/od315</code>. Es el bloque con mayor poder discriminante; su bimodalidad observada en el EDA separa con nitidez los vinos maduros frente a los astringentes o jóvenes.</li>
+                    <li><strong>Bloque de Vigor, Intensidad y Grado (PC2):</strong> <code>color_intensity</code> (1.28 a 13.00), <code>alcohol</code> (11.03° a 14.83°) y <code>malic_acid</code> (acidez fija). Separa vinos tintos de cuerpo robusto frente a vinos frescos y de alta acidez.</li>
+                    <li><strong>Marcador Estructural Clave:</strong> <code>proline</code> (278 a 1,680 mg/L). Aunque requirió estandarización obligatoria por su enorme escala (rango 1,402), es la variable que mejor aísla al Clúster 2 de alta graduación alcohólica (media ≈ 1,100).</li>
+                  </ul>
+                  <div style="background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8; padding: 8px 14px; border-radius: 0 8px 8px 0; font-size: 0.84rem; color: #bae6fd;">
+                    <strong>Evidencia en el informe:</strong> Bimodalidad en los histogramas del EDA (Sec. 3.3.4), correlación lineal |r| = 0.865 en Tabla 3C y mayores cargas factoriales en PCA (Sec. 4.3).
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        def _render_resp_2():
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.75); border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 12px; padding: 18px 20px; margin-top: 10px; margin-bottom: 12px;">
+                  <div style="color: #34d399; font-weight: 800; font-size: 1.02rem; margin-bottom: 8px;">
+                    📉 Respuesta a la Pregunta 2: Varianza retenida por componentes principales
+                  </div>
+                  <p style="color: #e2e8f0; font-size: 0.92rem; line-height: 1.55; margin-bottom: 12px;">
+                    Al proyectar las 13 dimensiones químicas estandarizadas sobre el espacio factorial de PCA, los componentes concentran la variabilidad de la siguiente forma:
+                  </p>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;">
+                    <div style="background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 8px; padding: 10px 14px; text-align: center;">
+                      <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">PC1 + PC2 (2D)</div>
+                      <div style="font-size: 1.5rem; font-weight: 800; color: #34d399;">55.41 %</div>
+                      <div style="font-size: 0.76rem; color: #cbd5e1;">PC1: 36.20% | PC2: 19.21%</div>
+                    </div>
+                    <div style="background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 8px; padding: 10px 14px; text-align: center;">
+                      <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">PC1 + PC2 + PC3 (3D)</div>
+                      <div style="font-size: 1.5rem; font-weight: 800; color: #34d399;">66.50 %</div>
+                      <div style="font-size: 0.76rem; color: #cbd5e1;">Aporte de PC3: 11.09%</div>
+                    </div>
+                    <div style="background: rgba(52, 211, 153, 0.08); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 8px; padding: 10px 14px; text-align: center;">
+                      <div style="font-size: 0.78rem; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Umbral Convencional (80%)</div>
+                      <div style="font-size: 1.5rem; font-weight: 800; color: #fbbf24;">5 CP (80.16 %)</div>
+                      <div style="font-size: 0.76rem; color: #cbd5e1;">Requeridos para el 80%</div>
+                    </div>
+                  </div>
+                  <p style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.55; margin-bottom: 0;">
+                    <strong>Interpretación:</strong> Dos componentes (55.41 %) son suficientes para una <em>síntesis visual intuitiva</em> en dos ejes interpretables, pero suponen una pérdida del 44.59 % de información. Por ello, el agrupamiento con K-Means y DBSCAN se ejecutó obligatoriamente sobre las <strong>13 variables completas</strong> y no sobre el plano reducido.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        def _render_resp_3():
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.75); border: 1px solid rgba(244, 63, 94, 0.35); border-radius: 12px; padding: 18px 20px; margin-top: 10px; margin-bottom: 12px;">
+                  <div style="color: #f43f5e; font-weight: 800; font-size: 1.02rem; margin-bottom: 8px;">
+                    ⚖️ Respuesta a la Pregunta 3: Coincidencia o divergencia entre K-Means y DBSCAN
+                  </div>
+                  <p style="color: #e2e8f0; font-size: 0.92rem; line-height: 1.55; margin-bottom: 12px;">
+                    <strong>Divergen sustancialmente</strong> debido a las naturalezas matemáticas opuestas de ambos algoritmos (partición convexa vs. conectividad por densidad):
+                  </p>
+                  <ul style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.6; margin-bottom: 12px;">
+                    <li><strong>K-Means (Partición esférica):</strong> Divide obligatoriamente al <strong>100 % de las muestras</strong> (178/178) en 3 perfiles balanceados (65, 51 y 62 vinos). Coincide en 96.6 % con los tres cultivares reales de uva.</li>
+                    <li><strong>DBSCAN (Densidad):</strong> Con &epsilon; = 2.3 y min_samples = 5, identifica únicamente <strong>2 regiones densas</strong> (94 y 42 muestras) y aísla <strong>42 muestras como ruido (-1)</strong>, alcanzando una cobertura de solo 76.4 %. Fusiona los clústeres 0 y 2 de K-Means porque en 13 dimensiones comparten un corredor continuo de densidad.</li>
+                    <li><strong>El Hallazgo Clave de Coincidencia:</strong> El Clúster 1 de DBSCAN (42 vinos) queda <em>100 % contenido</em> dentro del Clúster 1 de K-Means (vinos de baja madurez fenólica). Además, <strong>13 de los 17 vinos con valores atípicos del EDA (76.5 %)</strong> fueron capturados por DBSCAN como ruido.</li>
+                  </ul>
+                  <div style="background: rgba(244, 63, 94, 0.1); border-left: 3px solid #f43f5e; padding: 8px 14px; border-radius: 0 8px 8px 0; font-size: 0.84rem; color: #fecdd3;">
+                    <strong>Veredicto de negocio:</strong> Son herramientas complementarias. K-Means sirve para segmentar comercialmente la totalidad del catálogo; DBSCAN sirve como filtro de auditoría para detectar lotes atípicos.
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        if pregunta_sel.startswith("1."):
+            _render_resp_1()
+        elif pregunta_sel.startswith("2."):
+            _render_resp_2()
+        elif pregunta_sel.startswith("3."):
+            _render_resp_3()
+        else:
+            _render_resp_1()
+            _render_resp_2()
+            _render_resp_3()
+
+    with tab_obj:
+        st.subheader("Objetivos del Proyecto")
+        st.markdown(
+            """
+            <div style="background: rgba(30, 41, 59, 0.4); border-left: 4px solid #f43f5e; padding: 14px 18px; border-radius: 0 10px 10px 0; margin-bottom: 16px;">
+              <strong style="color: #f43f5e; font-size: 0.95rem;">🎯 OBJETIVO GENERAL:</strong><br>
+              <span style="color: #e2e8f0; font-size: 0.92rem;">
+                Desarrollar y evaluar una aplicación en Streamlit que permita obtener, describir y comparar agrupamientos de muestras de vino mediante K-Means y DBSCAN, incorporando PCA como análisis de dimensionalidad y herramienta de visualización, para descubrir perfiles fisicoquímicos interpretables sin emplear las clases de referencia.
+              </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("**📌 Objetivos Específicos:**")
+        col_o1, col_o2, col_o3 = st.columns(3)
+        with col_o1:
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; height: 100%;">
+                  <div style="color: #38bdf8; font-weight: 800; font-size: 1.05rem; margin-bottom: 6px;">01. PREPARACIÓN</div>
+                  <p style="font-size: 0.88rem; color: #cbd5e1; margin: 0; line-height: 1.45;">
+                    <strong>Preparar las variables químicas pertinentes:</strong> separar la etiqueta externa, verificar nulos y duplicados, y estandarizar la matriz de entrada.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with col_o2:
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; height: 100%;">
+                  <div style="color: #34d399; font-weight: 800; font-size: 1.05rem; margin-bottom: 6px;">02. MODELADO Y MÉTRICAS</div>
+                  <p style="font-size: 0.88rem; color: #cbd5e1; margin: 0; line-height: 1.45;">
+                    <strong>Evaluar al menos dos configuraciones de agrupamiento:</strong> (K-Means y DBSCAN) mediante <em>inertia</em>, <em>Silhouette</em>, <em>Davies-Bouldin</em> y <em>Calinski-Harabasz</em>.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with col_o3:
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; height: 100%;">
+                  <div style="color: #fbbf24; font-weight: 800; font-size: 1.05rem; margin-bottom: 6px;">03. PCA Y RECOMENDACIONES</div>
+                  <p style="font-size: 0.88rem; color: #cbd5e1; margin: 0; line-height: 1.45;">
+                    <strong>Interpretar PCA:</strong> (varianza explicada y cargas) y convertir los hallazgos en recomendaciones para el laboratorio.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with tab_lim:
+        st.subheader("Unidad de Análisis, Relevancia y Límites")
+        st.caption("Síntesis metodológica del alcance del estudio:")
+
+        col_u1, col_u2 = st.columns(2)
+        with col_u1:
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="color: #38bdf8; font-weight: 800; font-size: 0.98rem;">📌 1. UNIDAD DE OBSERVACIÓN</span>
+                    <span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; padding: 2px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 700;">1 MUESTRA = 13 VARIABLES</span>
+                  </div>
+                  <p style="font-size: 0.88rem; color: #cbd5e1; margin: 0; line-height: 1.5;">
+                    La unidad de observación es la muestra de vino; cada registro corresponde a un vino descrito por 13 variables químicas continuas o enteras.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 18px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="color: #34d399; font-weight: 800; font-size: 0.98rem;">💡 3. RELEVANCIA DEL ESTUDIO</span>
+                    <span style="background: rgba(52, 211, 153, 0.15); color: #34d399; padding: 2px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 700;">CONTROL Y AUDITORÍA</span>
+                  </div>
+                  <p style="font-size: 0.88rem; color: #cbd5e1; margin: 0; line-height: 1.5;">
+                    Identificar perfiles químicos permite apoyar la caracterización y el control de calidad de lotes, detectar muestras atípicas (ruido en DBSCAN) y generar hipótesis sobre qué variables diferencian a los vinos, con menor dependencia de clasificaciones manuales.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with col_u2:
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="color: #fbbf24; font-weight: 800; font-size: 0.98rem;">🏷️ 2. ENFOQUE NO SUPERVISADO</span>
+                    <span style="background: rgba(251, 191, 36, 0.15); color: #fbbf24; padding: 2px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 700;">TARGET EXCLUIDO</span>
+                  </div>
+                  <p style="font-size: 0.88rem; color: #cbd5e1; margin: 0; line-height: 1.5;">
+                    K-Means y DBSCAN agrupan según la similitud entre observaciones en el espacio de variables, sin necesitar una etiqueta. La clase original (cultivar) del dataset se excluye del entrenamiento y de la elección de K y solo se usa, de forma posterior, como referencia externa para contrastar si los grupos hallados tienen sentido.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 18px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="color: #f43f5e; font-weight: 800; font-size: 0.98rem;">⚠️ 4. LÍMITES METODOLÓGICOS</span>
+                    <span style="background: rgba(244, 63, 94, 0.15); color: #f43f5e; padding: 2px 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 700;">178 VINOS · 1 REGIÓN</span>
+                  </div>
+                  <p style="font-size: 0.88rem; color: #cbd5e1; margin: 0; line-height: 1.5;">
+                    El dataset es pequeño (178 muestras), proviene de una sola región de Italia y de tres cultivares, y la ficha no documenta las unidades de medida. Los resultados describen patrones de esta muestra y no deben generalizarse a otras regiones o cosechas sin validación.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
 
 # ----------------------------------------------------------------- Datos
@@ -145,28 +408,111 @@ def pagina_datos():
     df, etiqueta = obtener_datos()
     variables = [c for c in df.columns if c != etiqueta]
 
-    st.subheader("Ficha técnica")
-    if origen.startswith("Dataset"):
-        st.table(pd.Series(FICHA, name="Detalle").to_frame())
-    else:
-        st.caption("Archivo propio: la ficha del dataset Wine no aplica.")
-
+    # Banner de KPIs de Dimensiones y Calidad
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Registros", df.shape[0])
-    c2.metric("Variables", len(variables))
-    c3.metric("Valores nulos", int(df.isna().sum().sum()))
-    c4.metric("Duplicados", int(df.duplicated().sum()))
-    if etiqueta:
-        st.caption(f"Etiqueta externa: **{etiqueta}** (fuera de X y de la elección de K).")
+    c1.metric("Muestras Totales", f"{df.shape[0]}", "Filas (N)")
+    c2.metric("Variables Predictoras", f"{len(variables)}", "Columnas continuas")
+    c3.metric("Valores Nulos", f"{int(df.isna().sum().sum())}", "Datos completos")
+    c4.metric("Registros Duplicados", f"{int(df.duplicated().sum())}", "0 duplicados")
 
-    st.subheader("Muestra de registros")
-    n = st.slider("Número de filas", 5, min(50, len(df)), 10)
-    st.dataframe(df.head(n), use_container_width=True)
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
+    tab_fic, tab_dic, tab_reg = st.tabs([
+        "📋 1. Ficha Técnica y Calidad",
+        "📖 2. Diccionario de Variables y Familias",
+        "👁️ 3. Muestra de Registros",
+    ])
+
+    with tab_fic:
+        st.subheader("Fuente y Ficha Técnica del Dataset")
+        if origen.startswith("Dataset"):
+            df_ficha = pd.DataFrame([
+                {"Campo": "Dataset", "Detalle": "Wine — UCI Machine Learning Repository (Aeberhard & Forina, 1992)"},
+                {"Campo": "Enlace oficial", "Detalle": "https://archive.ics.uci.edu/dataset/109/wine"},
+                {"Campo": "DOI", "Detalle": "10.24432/C5PC7J"},
+                {"Campo": "Autores / Editores", "Detalle": "Stefan Aeberhard y M. Forina (Universidad de Génova, Italia)"},
+                {"Campo": "Licencia", "Detalle": "Creative Commons Attribution 4.0 International (CC BY 4.0)"},
+                {"Campo": "Unidad de observación", "Detalle": "Muestra de vino (13 determinaciones analíticas físico-químicas)"},
+                {"Campo": "N.º registros / variables", "Detalle": "178 registros; 13 variables predictoras continuas/enteras + 1 etiqueta externa (3 cultivares)"},
+                {"Campo": "Calidad inicial", "Detalle": "0 valores faltantes (sin imputación) y 0 registros duplicados"},
+            ])
+            st.table(df_ficha.set_index("Campo"))
+
+            st.markdown(
+                """
+                <div style="background: rgba(30, 41, 59, 0.45); border-left: 4px solid #f43f5e; border-radius: 0 10px 10px 0; padding: 14px 18px; margin-top: 10px;">
+                  <strong style="color: #f43f5e; font-size: 0.95rem;">⚠️ Posibles Sesgos del Dataset:</strong>
+                  <ul style="color: #cbd5e1; font-size: 0.88rem; margin: 8px 0 0 0; line-height: 1.55;">
+                    <li><strong>Muestra pequeña:</strong> 178 observaciones limitan la generalización a escala industrial.</li>
+                    <li><strong>Ámbito geográfico restringido:</strong> Muestras procedentes de una sola región vitivinícola de Italia.</li>
+                    <li><strong>Clases moderadamente desbalanceadas:</strong> 59, 71 y 48 muestras por cultivar.</li>
+                    <li><strong>Datos históricos (1991):</strong> Pueden no reflejar vendimias modernas ni técnicas contemporáneas.</li>
+                    <li><strong>Unidades de medida:</strong> No están documentadas explícitamente en el repositorio UCI.</li>
+                  </ul>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.info("Archivo cargado por el usuario. La ficha técnica del repositorio UCI aplica exclusivamente al dataset oficial Wine.")
+
+    with tab_dic:
+        st.subheader("Diccionario de Variables y Familias Químicas")
+        if origen.startswith("Dataset"):
+            diccionario_datos = pd.DataFrame([
+                {"Familia Química": "🍇 Composición Básica", "Variable": "alcohol", "Descripción": "Graduación alcohólica del vino", "Tipo": "Continua"},
+                {"Familia Química": "🍇 Composición Básica", "Variable": "malic_acid", "Descripción": "Ácido málico (acidez fija del mosto)", "Tipo": "Continua"},
+                {"Familia Química": "🍇 Composición Básica", "Variable": "ash", "Descripción": "Cenizas totales (materia mineral inorgánica)", "Tipo": "Continua"},
+                {"Familia Química": "🍇 Composición Básica", "Variable": "alcalinity_of_ash", "Descripción": "Alcalinidad de las cenizas", "Tipo": "Continua"},
+                {"Familia Química": "🍇 Composición Básica", "Variable": "magnesium", "Descripción": "Contenido de magnesio", "Tipo": "Entera / Numérica"},
+                {"Familia Química": "🧪 Bloque Fenólico", "Variable": "total_phenols", "Descripción": "Polifenoles totales (antioxidantes naturales)", "Tipo": "Continua"},
+                {"Familia Química": "🧪 Bloque Fenólico", "Variable": "flavanoids", "Descripción": "Flavonoides (astringencia, sabor y longevidad)", "Tipo": "Continua"},
+                {"Familia Química": "🧪 Bloque Fenólico", "Variable": "nonflavanoid_phenols", "Descripción": "Fenoles no flavonoides", "Tipo": "Continua"},
+                {"Familia Química": "🧪 Bloque Fenólico", "Variable": "proanthocyanins", "Descripción": "Proantocianidinas (taninos condensados)", "Tipo": "Continua"},
+                {"Familia Química": "🎨 Color y Matiz", "Variable": "color_intensity", "Descripción": "Intensidad colorimétrica espectral", "Tipo": "Continua"},
+                {"Familia Química": "🎨 Color y Matiz", "Variable": "hue", "Descripción": "Matiz / tonalidad del color del vino", "Tipo": "Continua"},
+                {"Familia Química": "🎨 Color y Matiz", "Variable": "od280/od315_of_diluted_wines", "Descripción": "Cociente de absorbancia proteica a 280/315 nm", "Tipo": "Continua"},
+                {"Familia Química": "🧬 Marcador Estructural", "Variable": "proline", "Descripción": "Aminoácido prolina (madurez y extracto seco)", "Tipo": "Continua"},
+                {"Familia Química": "🏷️ Etiqueta Externa", "Variable": "target (cultivar)", "Descripción": "3 cultivares: Barolo (59), Grignolino (71), Barbera (48)", "Tipo": "Categórica (EXCLUIDA de X)"},
+            ])
+            st.dataframe(diccionario_datos, use_container_width=True, hide_index=True)
+
+            st.markdown(
+                """
+                <div style="background: rgba(22, 25, 34, 0.75); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 16px 20px; margin-top: 14px;">
+                  <div style="color: #38bdf8; font-weight: 800; font-size: 0.98rem; margin-bottom: 6px;">
+                    🔬 Esquema del Enfoque No Supervisado
+                  </div>
+                  <p style="color: #cbd5e1; font-size: 0.88rem; margin: 0; line-height: 1.55;">
+                    <strong>13 Variables fisicoquímicas continuas</strong> ➔ Entrada al pipeline (K-Means / DBSCAN) ➔ <strong>Clústeres descubiertos</strong>.<br>
+                    <span style="color: #f43f5e; font-weight: 700;">Variable Target (3 cultivares):</span> Se mantiene <strong>estrictamente aislada</strong> del modelado. No interviene en la estandarización ni en la elección de <em>K</em> o &epsilon;. Solo se emplea en la sección de Conclusiones como validación externa de sentido agronómico.
+                  </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        else:
+            st.dataframe(pd.DataFrame({"Variable": df.columns, "Tipo": [str(df[c].dtype) for c in df.columns]}), use_container_width=True)
+
+    with tab_reg:
+        st.subheader("Muestra de Registros del Conjunto de Datos")
+        c_slider, c_info = st.columns([1, 2])
+        with c_slider:
+            n = st.slider("Filas a visualizar:", 5, min(50, len(df)), 10)
+        with c_info:
+            if etiqueta:
+                st.caption(f"Etiqueta externa activa: **{etiqueta}** (no utilizada para entrenar el agrupamiento).")
+        st.dataframe(df.head(n), use_container_width=True)
 
 
 # ------------------------------------------------------------------- EDA
 def pagina_eda():
     st.header("🔍 Análisis Exploratorio de Datos (EDA)")
+    st.markdown(
+        "**Propósito:** Verificar la calidad de los datos, comparar escalas, caracterizar distribuciones, "
+        "auditar valores atípicos y medir colinealidades lineales antes de aplicar cualquier algoritmo de agrupamiento."
+    )
+
     df, etiqueta = requerir_datos()
     if df is None:
         return
@@ -174,24 +520,53 @@ def pagina_eda():
     vars_analisis = [c for c in df.columns if c != etiqueta]
     df_vars = df[vars_analisis]
 
+    # --- Banner de 3 KPIs Ejecutivos (Diapositiva 7 del PPTX) ---
+    col_k1, col_k2, col_k3 = st.columns(3)
+    with col_k1:
+        st.markdown("""
+        <div class="kpi-card">
+            <div class="kpi-title">MUESTRAS Y PREDICTORAS</div>
+            <div class="kpi-value">178 × 13</div>
+            <div class="kpi-subtitle">0 nulos · 0 duplicados (calidad 100%, sin imputación)</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_k2:
+        st.markdown("""
+        <div class="kpi-card">
+            <div class="kpi-title">HETEROGENEIDAD DE ESCALAS</div>
+            <div class="kpi-value">&gt; 2,000×</div>
+            <div class="kpi-subtitle">Razón σ (proline: 314.9 vs nonflavanoid: 0.124) → Escalar es obligatorio</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_k3:
+        st.markdown("""
+        <div class="kpi-card">
+            <div class="kpi-title">VALORES ATÍPICOS (TUKEY)</div>
+            <div class="kpi-value">7 de 13</div>
+            <div class="kpi-subtitle">Variables con atípicos (≤ 2.25% c/u) · Se conservan intencionalmente</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-bottom: 1.2rem;'></div>", unsafe_allow_html=True)
+
     pestanas = st.tabs([
         "1. Estructura y Calidad",
-        "2. Estadísticos Descriptivos",
-        "3. Distribuciones (Histogramas)",
-        "4. Outliers (Boxplots)",
-        "5. Matriz de Correlación",
-        "6. Hallazgos Clave",
+        "2. Descriptivos y Escalas",
+        "3. Distribuciones y Forma",
+        "4. Valores Atípicos (Tukey)",
+        "5. Correlación de Pearson",
+        "6. Síntesis de Hallazgos",
     ])
 
-    # 1. Estructura y Calidad
+    # 1. Estructura y Calidad (Sección 3.3.1 y Tabla 3 / 5)
     with pestanas[0]:
-        st.subheader("1. Estructura y calidad del conjunto de datos")
+        st.subheader("3.3.1 Dimensión, tipos, nulos y duplicados")
         col_a, col_b, col_c = st.columns(3)
-        col_a.metric("Total observaciones", df.shape[0])
-        col_b.metric("Total variables predictoras", len(vars_analisis))
+        col_a.metric("Total observaciones (N)", df.shape[0])
+        col_b.metric("Variables predictoras (p)", len(vars_analisis))
         col_c.metric("Filas duplicadas", int(df_vars.duplicated().sum()))
 
-        st.markdown("**Resumen de tipos de datos y valores faltantes por columna:**")
+        st.markdown("**Tabla 3. Resumen de tipos de datos y valores faltantes por columna:**")
         info_df = pd.DataFrame({
             "Variable": df_vars.columns,
             "Tipo de Dato": df_vars.dtypes.astype(str).values,
@@ -206,25 +581,36 @@ def pagina_eda():
             hide_index=True,
             height=(len(info_df) + 1) * 36 + 10,
         )
-        if df_vars.isnull().sum().sum() == 0:
-            st.success("✅ No existen valores nulos ni registros duplicados en las variables fisicoquímicas.")
 
-    # 2. Estadísticos Descriptivos
+        st.markdown("""
+        <div style="background-color: #161922; border-left: 4px solid #38bdf8; border-radius: 4px; padding: 12px 16px; margin-top: 15px;">
+            <div style="font-weight: 600; color: #38bdf8; font-size: 0.92rem; margin-bottom: 4px;">📌 Interpretación Metodológica:</div>
+            <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.5;">
+                El conjunto de datos está <b>completo y rigurosamente limpio</b>: no hay valores faltantes ni registros repetidos, por lo que no fue necesario imputar ni eliminar filas. 
+                Todas las variables son numéricas (la variable <code>magnesium</code> es entera en la ficha original de UCI, pero scikit-learn la carga como <code>float64</code>), 
+                de modo que tampoco se requirió codificación de variables categóricas. Cada fila corresponde a una muestra de vino analizada instrumentalmente en laboratorio, constituyendo la unidad de análisis del proyecto.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # 2. Estadísticos Descriptivos y Heterogeneidad de Escalas (3.3.2 y 3.3.3)
     with pestanas[1]:
-        st.subheader("2. Resumen estadístico multivariado")
+        st.subheader("3.3.2 y 3.3.3 Estadísticos descriptivos y heterogeneidad de escalas")
         desc = df_vars.describe().T
         desc["rango"] = desc["max"] - desc["min"]
         desc["iqr"] = desc["75%"] - desc["25%"]
         desc["skewness"] = df_vars.skew()
-        
+
         columnas_orden = ["mean", "std", "min", "25%", "50%", "75%", "max", "rango", "iqr", "skewness"]
         nombres_amigables = {
-            "mean": "Media", "std": "Desv. Est.", "min": "Mín", "25%": "Q1 (25%)",
+            "mean": "Media", "std": "Desv. Est. (σ)", "min": "Mín", "25%": "Q1 (25%)",
             "50%": "Mediana", "75%": "Q3 (75%)", "max": "Máx", "rango": "Rango",
             "iqr": "IQR", "skewness": "Asimetría"
         }
         desc_mostrar = desc[columnas_orden].rename(columns=nombres_amigables).round(3)
         desc_mostrar.insert(0, "Variable", desc_mostrar.index)
+
+        st.markdown("**Tabla 3A. Estadísticos descriptivos de las 13 variables fisicoquímicas (N = 178):**")
         st.dataframe(
             desc_mostrar,
             use_container_width=True,
@@ -232,17 +618,44 @@ def pagina_eda():
             height=(len(desc_mostrar) + 1) * 36 + 10,
         )
 
-        st.info(
-            "💡 **Observación crítica de escalas:** Las variables presentan magnitudes y rangos drásticamente dispares. "
-            "Por ejemplo, `proline` alcanza valores de hasta 1,680 con un rango de 1,402, mientras que "
-            "`nonflavanoid_phenols` varía únicamente entre 0.13 y 0.66. "
-            "Esto demuestra la **necesidad obligatoria de estandarización** antes de aplicar algoritmos basados en distancias (K-Means, DBSCAN y PCA)."
-        )
+        col_desc_1, col_desc_2 = st.columns(2, gap="medium")
+        with col_desc_1:
+            st.markdown("""
+            <div style="background-color: #161922; border: 1px solid #232734; border-radius: 6px; padding: 14px 16px; height: 100%;">
+                <div style="font-weight: 600; color: #38bdf8; font-size: 0.92rem; margin-bottom: 6px;">📊 Interpretación de Asimetría:</div>
+                <div style="color: #cbd5e1; font-size: 0.85rem; line-height: 1.5;">
+                    • <b>Distribuciones aproximadamente simétricas:</b> En la mayoría de variables la media y la mediana son muy parecidas y la asimetría es cercana a cero (<code>alcohol</code>, <code>ash</code>, <code>alcalinity_of_ash</code>, <code>total_phenols</code>, <code>flavanoids</code> y <code>hue</code>).<br>
+                    • <b>Colas largas hacia la derecha:</b> En cambio, <code>malic_acid</code> (asimetría +1.04), <code>magnesium</code> (+1.10), <code>color_intensity</code> (+0.87) y <code>proline</code> (+0.77) tienen la media por encima de la mediana (por ejemplo, <code>proline</code>: 746.9 frente a 673.5), señal de colas prolongadas hacia concentraciones altas.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col_desc_2:
+            st.markdown("""
+            <div style="background-color: #161922; border: 1px solid #232734; border-radius: 6px; padding: 14px 16px; height: 100%;">
+                <div style="font-weight: 600; color: #f43f5e; font-size: 0.92rem; margin-bottom: 6px;">⚖️ Heterogeneidad de Escalas:</div>
+                <div style="color: #cbd5e1; font-size: 0.85rem; line-height: 1.5;">
+                    • <b>Disparidad extrema:</b> <code>proline</code> va de 278 a 1,680 (rango 1,402; σ = 314.9), mientras que <code>nonflavanoid_phenols</code> varía solo entre 0.13 y 0.66 (rango 0.53; σ = 0.124).<br>
+                    • <b>Consecuencia algorítmica:</b> K-Means, DBSCAN y PCA operan sobre distancias euclídeas o matrices de covarianza. Si se usaran los datos sin transformar, <code>proline</code> y <code>magnesium</code> dominarían el cálculo y las variables fenólicas casi no influirían. <b>Por eso el escalado es obligatorio y no opcional.</b>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-    # 3. Distribuciones
+    # 3. Distribuciones (3.3.4 y Figura 1)
     with pestanas[2]:
-        st.subheader("3. Distribución de las variables fisicoquímicas")
-        modo_vista = st.radio("Modo de visualización:", ["Variable individual a detalle", "Ver todas en cuadrícula"], horizontal=True)
+        st.subheader("3.3.4 Distribuciones fisicoquímicas y comportamientos enológicos")
+
+        st.markdown("""
+        <div style="background-color: #161922; border-left: 4px solid #a855f7; border-radius: 4px; padding: 12px 16px; margin-bottom: 16px;">
+            <div style="font-weight: 600; color: #c084fc; font-size: 0.92rem; margin-bottom: 4px;">🔬 Los 3 Comportamientos Enológicos Identificados:</div>
+            <div style="color: #cbd5e1; font-size: 0.86rem; line-height: 1.5;">
+                <b>1. Forma acampanada y unimodal:</b> <code>alcohol</code>, <code>ash</code>, <code>alcalinity_of_ash</code> y <code>hue</code> presentan asimetría cercana a cero.<br>
+                <b>2. Bimodalidad (indicio inicial de clústeres):</b> <code>flavanoids</code>, <code>total_phenols</code> y <code>od280/od315</code> sugieren dos concentraciones de valores (baja y alta madurez fenólica). Es un indicio visual de que las muestras podrían separarse en grupos agronómicos diferenciados.<br>
+                <b>3. Cola larga hacia valores altos:</b> <code>malic_acid</code>, <code>magnesium</code>, <code>color_intensity</code> y <code>proline</code> (asimetría entre +0.77 y +1.10). En las tres primeras se debe a unas pocas muestras extremas; en <code>proline</code> la cola es gradual y no genera atípicos bajo Tukey.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        modo_vista = st.radio("Modo de visualización:", ["Variable individual a detalle", "Ver todas en cuadrícula (Figura 1 del Informe)"], horizontal=True)
 
         if modo_vista == "Variable individual a detalle":
             var_sel = st.selectbox("Selecciona la variable a inspeccionar:", vars_analisis)
@@ -254,23 +667,44 @@ def pagina_eda():
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             col_m1.metric("Media", f"{media:.2f}")
             col_m2.metric("Mediana", f"{mediana:.2f}")
-            col_m3.metric("Desv. Estándar", f"{desv:.2f}")
-            col_m4.metric("Coef. Asimetría", f"{asimetria:.2f}")
+            col_m3.metric("Desv. Estándar (σ)", f"{desv:.2f}")
+            col_m4.metric("Coef. Asimetría", f"{asimetria:+.2f}")
 
-            fig, ax = plt.subplots(figsize=(8, 4))
+            fig, ax = plt.subplots(figsize=(8.5, 4.4))
             if HAS_SEABORN:
                 sns.histplot(df_vars[var_sel], kde=True, color="#f43f5e", ax=ax, bins=20, edgecolor="#161922", alpha=0.75)
             else:
                 ax.hist(df_vars[var_sel], bins=20, color="#f43f5e", edgecolor="#161922", alpha=0.75)
+
+            # Anotar valores enteros de frecuencia sobre las barras
+            if ax.patches:
+                max_h = max([p.get_height() for p in ax.patches])
+                ax.set_ylim(0, max_h * 1.16)
+                for p in ax.patches:
+                    h = p.get_height()
+                    if h > 0:
+                        ax.annotate(
+                            f"{int(h)}",
+                            (p.get_x() + p.get_width() / 2.0, h),
+                            ha="center",
+                            va="bottom",
+                            fontsize=8,
+                            fontweight="bold",
+                            color="#fca5a5",
+                            xytext=(0, 2),
+                            textcoords="offset points",
+                        )
+
             ax.axvline(media, color="#38bdf8", linestyle="--", linewidth=1.8, label=f"Media ({media:.2f})")
             ax.axvline(mediana, color="#34d399", linestyle="-.", linewidth=1.8, label=f"Mediana ({mediana:.2f})")
-            ax.set_title(f"Distribución de {var_sel}", fontsize=12, fontweight="bold")
+            ax.set_title(f"Distribución y Densidad (KDE) de {var_sel}", fontsize=11.5, fontweight="bold")
             ax.set_xlabel(var_sel)
-            ax.set_ylabel("Frecuencia")
+            ax.set_ylabel("Frecuencia (conteo de muestras)")
             ax.legend()
             st.pyplot(fig)
             plt.close(fig)
         else:
+            st.caption("Figura 1. Histogramas y curvas de densidad (KDE) de las 13 variables fisicoquímicas")
             fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(16, 12))
             axes_flat = axes.flatten()
             for i, col in enumerate(vars_analisis):
@@ -287,10 +721,10 @@ def pagina_eda():
             st.pyplot(fig)
             plt.close(fig)
 
-    # 4. Outliers (Boxplots)
+    # 4. Valores Atípicos (3.3.5, Tabla 3B y Slide 7)
     with pestanas[3]:
-        st.subheader("4. Detección de valores atípicos (Outliers)")
-        
+        st.subheader("3.3.5 Detección de valores atípicos (Criterio de Tukey: 1.5 × IQR)")
+
         outliers_dict = {}
         for col in vars_analisis:
             q25 = df_vars[col].quantile(0.25)
@@ -300,33 +734,68 @@ def pagina_eda():
             lim_sup = q75 + 1.5 * iqr
             conteo = int(((df_vars[col] < lim_inf) | (df_vars[col] > lim_sup)).sum())
             outliers_dict[col] = {
-                "Límite Inferior": round(lim_inf, 2),
-                "Límite Superior": round(lim_sup, 2),
-                "Cant. Outliers": conteo,
-                "% Outliers": round((conteo / len(df_vars)) * 100, 2),
+                "Límite Inferior": round(lim_inf, 3),
+                "Límite Superior": round(lim_sup, 3),
+                "N.º de atípicos": conteo,
+                "%": round((conteo / len(df_vars)) * 100, 2),
             }
-        df_outliers = pd.DataFrame(outliers_dict).T.sort_values(by="Cant. Outliers", ascending=False)
+        df_outliers = pd.DataFrame(outliers_dict).T.sort_values(by="N.º de atípicos", ascending=False)
         df_outliers_mostrar = df_outliers.reset_index().rename(columns={"index": "Variable"})
 
+        # Gráfico Horizontal de Atípicos (Slide 7 del PPTX)
+        col_rank, col_exp = st.columns([1.1, 1.0], gap="large")
+        with col_rank:
+            st.markdown("**Ranking de Variables con Atípicos:**")
+            vars_con_out = [c for c in df_outliers.index if df_outliers.loc[c, "N.º de atípicos"] > 0]
+            conteo_con_out = [int(df_outliers.loc[c, "N.º de atípicos"]) for c in vars_con_out]
+            vars_con_out.reverse()
+            conteo_con_out.reverse()
+
+            fig_out, ax_out = plt.subplots(figsize=(6.2, 3.2))
+            barras = ax_out.barh(vars_con_out, conteo_con_out, color="#f43f5e", edgecolor="#ffffff", height=0.6, alpha=0.85)
+            ax_out.set_xlim(0, 5)
+            ax_out.set_xlabel("Número de observaciones atípicas")
+            for bar in barras:
+                w = bar.get_width()
+                pct = (w / len(df_vars)) * 100
+                ax_out.text(w + 0.12, bar.get_y() + bar.get_height() / 2, f"{int(w)} ({pct:.2f}%)", va="center", fontsize=8.5, color="#e2e8f0", fontweight="bold")
+            ax_out.grid(axis="x", linestyle="--", alpha=0.3)
+            plt.tight_layout()
+            st.pyplot(fig_out)
+            plt.close(fig_out)
+
+        with col_exp:
+            st.markdown("""
+            <div style="background-color: #161922; border-left: 4px solid #f43f5e; border-radius: 4px; padding: 12px 16px; margin-top: 15px;">
+                <div style="font-weight: 600; color: #f43f5e; font-size: 0.92rem; margin-bottom: 4px;">📌 Interpretación de Atípicos:</div>
+                <div style="color: #cbd5e1; font-size: 0.85rem; line-height: 1.5;">
+                    • <b>Presencia acotada:</b> 7 de las 13 variables presentan atípicos según la regla de Tukey <code>[Q1 − 1.5·IQR, Q3 + 1.5·IQR]</code>, y en ninguna superan el <b>2.25 % de las muestras</b> (máximo 4 casos).<br>
+                    • <b>Las 6 variables restantes:</b> <code>alcohol</code>, <code>total_phenols</code>, <code>flavanoids</code>, <code>nonflavanoid_phenols</code>, <code>od280/od315</code> y <code>proline</code> registran <b>0 atípicos</b>.<br>
+                    • <b>Decisión de conservación:</b> Son valores extremos pero químicamente verosímiles (vinos con acidez o color muy intensos), no errores de medición; por eso <b>se conservan en el dataset</b>. Esta decisión es crucial para <b>DBSCAN</b>, que auditará si estas muestras constituyen ruido (-1).
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("---")
         modo_box = st.radio(
             "Modo de visualización de boxplots:",
-            ["Variable individual a detalle", "Ver todas en cuadrícula"],
+            ["Variable individual a detalle", "Ver todas en cuadrícula (Figura 2 del Informe)"],
             horizontal=True,
             key="modo_box_sel",
         )
 
         col_config_outliers = {
             "Variable": st.column_config.TextColumn("Variable", width="medium"),
-            "Límite Inferior": st.column_config.NumberColumn("Lím. Inferior", format="%.2f"),
-            "Límite Superior": st.column_config.NumberColumn("Lím. Superior", format="%.2f"),
-            "Cant. Outliers": st.column_config.NumberColumn("Cant. Outliers", format="%d"),
-            "% Outliers": st.column_config.NumberColumn("% Outliers", format="%.2f%%"),
+            "Límite Inferior": st.column_config.NumberColumn("Lím. Inferior", format="%.3f"),
+            "Límite Superior": st.column_config.NumberColumn("Lím. Superior", format="%.3f"),
+            "N.º de atípicos": st.column_config.NumberColumn("N.º Atípicos", format="%d"),
+            "%": st.column_config.NumberColumn("% de Muestras", format="%.2f%%"),
         }
 
         if modo_box == "Variable individual a detalle":
-            col_t1, col_t2 = st.columns([1.4, 1.0], gap="large")
+            col_t1, col_t2 = st.columns([1.3, 1.1], gap="large")
             with col_t1:
-                st.markdown("**Resumen de atípicos (Criterio $1.5 \times IQR$):**")
+                st.markdown("**Tabla 3B. Valores atípicos por variable según la regla de Tukey:**")
                 st.dataframe(
                     df_outliers_mostrar,
                     use_container_width=True,
@@ -335,29 +804,29 @@ def pagina_eda():
                     column_config=col_config_outliers,
                 )
             with col_t2:
-                st.markdown("**Inspección visual de boxplots:**")
+                st.markdown("**Inspección visual del boxplot:**")
                 var_box = st.selectbox("Selecciona variable para boxplot:", vars_analisis, key="box_sel")
 
                 q25_v = df_vars[var_box].quantile(0.25)
                 q75_v = df_vars[var_box].quantile(0.75)
-                n_out_v = outliers_dict[var_box]["Cant. Outliers"]
+                n_out_v = outliers_dict[var_box]["N.º de atípicos"]
 
                 col_b1, col_b2, col_b3 = st.columns(3)
                 col_b1.metric("Q1 (25%)", f"{q25_v:.2f}")
                 col_b2.metric("Mediana", f"{df_vars[var_box].median():.2f}")
-                col_b3.metric("Outliers", f"{n_out_v}")
+                col_b3.metric("Atípicos", f"{n_out_v}")
 
-                fig, ax = plt.subplots(figsize=(6.5, 3.8))
+                fig, ax = plt.subplots(figsize=(6.8, 3.8))
                 if HAS_SEABORN:
                     sns.boxplot(
                         x=df_vars[var_box],
                         color="#f43f5e",
                         ax=ax,
-                        flierprops={"marker": "o", "color": "#f87171", "markersize": 6, "markeredgecolor": "#ffffff"},
+                        flierprops={"marker": "o", "color": "#f87171", "markersize": 6.5, "markeredgecolor": "#ffffff"},
                         boxprops={"edgecolor": "#ffffff", "linewidth": 1},
                         whiskerprops={"color": "#e2e8f0", "linewidth": 1},
                         capprops={"color": "#e2e8f0", "linewidth": 1},
-                        medianprops={"color": "#fbbf24", "linewidth": 2},
+                        medianprops={"color": "#fbbf24", "linewidth": 2.2},
                     )
                 else:
                     ax.boxplot(
@@ -367,16 +836,53 @@ def pagina_eda():
                         boxprops=dict(facecolor="#f43f5e", edgecolor="#ffffff"),
                         whiskerprops=dict(color="#e2e8f0"),
                         capprops=dict(color="#e2e8f0"),
-                        medianprops=dict(color="#fbbf24", linewidth=2),
-                        flierprops=dict(marker="o", markerfacecolor="#f87171", markersize=6, markeredgecolor="#ffffff"),
+                        medianprops=dict(color="#fbbf24", linewidth=2.2),
+                        flierprops=dict(marker="o", markerfacecolor="#f87171", markersize=6.5, markeredgecolor="#ffffff"),
                     )
+
+                # Anotar estadísticos clave en el boxplot individual
+                med_val = float(df_vars[var_box].median())
+                lim_i = outliers_dict[var_box]["Límite Inferior"]
+                lim_s = outliers_dict[var_box]["Límite Superior"]
+
+                ax.annotate(
+                    f"Med: {med_val:.2f}",
+                    xy=(med_val, 0),
+                    xytext=(0, 28),
+                    textcoords="offset points",
+                    ha="center",
+                    fontsize=8.2,
+                    fontweight="bold",
+                    color="#fbbf24",
+                    arrowprops=dict(arrowstyle="->", color="#fbbf24", lw=1.2),
+                    bbox=dict(boxstyle="round,pad=0.2", facecolor="#161922", edgecolor="#fbbf24", alpha=0.9)
+                )
+
+                ax.annotate(f"Q1: {q25_v:.2f}", xy=(q25_v, 0), xytext=(0, -25), textcoords="offset points", ha="center", fontsize=7.8, color="#cbd5e1")
+                ax.annotate(f"Q3: {q75_v:.2f}", xy=(q75_v, 0), xytext=(0, -25), textcoords="offset points", ha="center", fontsize=7.8, color="#cbd5e1")
+
+                # Anotar valores atípicos individuales
+                out_vals = df_vars.loc[(df_vars[var_box] < lim_i) | (df_vars[var_box] > lim_s), var_box].values
+                for o_v in out_vals:
+                    ax.annotate(
+                        f"{o_v:.2f}",
+                        xy=(o_v, 0),
+                        xytext=(0, 16),
+                        textcoords="offset points",
+                        ha="center",
+                        fontsize=7.8,
+                        fontweight="bold",
+                        color="#f87171"
+                    )
+
+                ax.set_ylim(-0.55, 0.55)
                 ax.set_title(f"Diagrama de Caja de {var_box}", fontsize=11, fontweight="bold")
                 ax.set_xlabel(var_box)
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close(fig)
         else:
-            st.markdown("**Resumen de atípicos (Criterio $1.5 \times IQR$):**")
+            st.markdown("**Tabla 3B. Valores atípicos por variable según la regla de Tukey:**")
             st.dataframe(
                 df_outliers_mostrar,
                 use_container_width=True,
@@ -385,7 +891,7 @@ def pagina_eda():
                 column_config=col_config_outliers,
             )
             st.markdown("---")
-            st.markdown("**Cuadrícula de Diagramas de Caja (todas las variables fisicoquímicas):**")
+            st.caption("Figura 2. Diagramas de caja de las 13 variables fisicoquímicas")
             fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(16, 12))
             axes_flat = axes.flatten()
             for i, col in enumerate(vars_analisis):
@@ -412,8 +918,8 @@ def pagina_eda():
                         medianprops=dict(color="#fbbf24", linewidth=1.8),
                         flierprops=dict(marker="o", markerfacecolor="#f87171", markersize=5, markeredgecolor="#ffffff"),
                     )
-                n_out = outliers_dict[col]["Cant. Outliers"]
-                titulo_color = "#c0392b" if n_out > 0 else "#2c3e50"
+                n_out = outliers_dict[col]["N.º de atípicos"]
+                titulo_color = "#f43f5e" if n_out > 0 else "#94a3b8"
                 ax.set_title(f"{col} ({n_out} atípicos)", fontsize=10, fontweight="bold", color=titulo_color)
                 ax.set_xlabel("")
             for j in range(len(vars_analisis), len(axes_flat)):
@@ -422,11 +928,9 @@ def pagina_eda():
             st.pyplot(fig)
             plt.close(fig)
 
-        st.caption("Variables con outliers detectados: `magnesium` (4), `alcalinity_of_ash` (4), `color_intensity` (4), `malic_acid` (3), `ash` (3), `proanthocyanins` (2) y `hue` (1).")
-
-    # 5. Correlación
+    # 5. Correlación de Pearson (3.3.6, Tabla 3C y Figura 3)
     with pestanas[4]:
-        st.subheader("5. Matriz de correlación lineal de Pearson")
+        st.subheader("3.3.6 Correlación lineal de Pearson y relaciones multivariadas")
         corr = df_vars.corr()
 
         vista_matriz = st.radio(
@@ -474,17 +978,35 @@ def pagina_eda():
         st.pyplot(fig)
         plt.close(fig)
 
-        pares_corr = []
-        for i in range(len(corr.columns)):
-            for j in range(i + 1, len(corr.columns)):
-                col1 = corr.columns[i]
-                col2 = corr.columns[j]
-                pares_corr.append((col1, col2, corr.iloc[i, j], abs(corr.iloc[i, j])))
-        pares_df = pd.DataFrame(pares_corr, columns=["Variable 1", "Variable 2", "Correlación (r)", "Magnitud"])
-        pares_df = pares_df.sort_values(by="Magnitud", ascending=False).drop(columns=["Magnitud"]).head(6)
+        # Tabla 3C exacta del Informe (Top 10 pares con |r|)
+        st.markdown("**Tabla 3C. Los 10 pares de variables con mayor correlación lineal (|r|):**")
+        st.caption("En total, 14 pares superan |r| > 0.50; aquí se muestran los 10 de mayor magnitud.")
 
-        st.markdown("**Pares de variables con mayor correlación lineal:**")
-        st.dataframe(pares_df.reset_index(drop=True), use_container_width=True)
+        tabla_3c_datos = [
+            {"N.º": 1, "Par de Variables": "total_phenols — flavanoids", "r": "+0.865", "Lectura Enológica": "Positiva muy fuerte (núcleo fenólico)"},
+            {"N.º": 2, "Par de Variables": "flavanoids — od280/od315_of_diluted_wines", "r": "+0.787", "Lectura Enológica": "Positiva fuerte (absorbancia y flavonoides)"},
+            {"N.º": 3, "Par de Variables": "total_phenols — od280/od315_of_diluted_wines", "r": "+0.700", "Lectura Enológica": "Positiva fuerte (indicador proteico/fenólico)"},
+            {"N.º": 4, "Par de Variables": "flavanoids — proanthocyanins", "r": "+0.653", "Lectura Enológica": "Positiva moderada-fuerte (taninos condensados)"},
+            {"N.º": 5, "Par de Variables": "alcohol — proline", "r": "+0.644", "Lectura Enológica": "Positiva moderada (madurez de uva y vigor)"},
+            {"N.º": 6, "Par de Variables": "total_phenols — proanthocyanins", "r": "+0.612", "Lectura Enológica": "Positiva moderada (polifenoles totales)"},
+            {"N.º": 7, "Par de Variables": "hue — od280/od315_of_diluted_wines", "r": "+0.565", "Lectura Enológica": "Positiva moderada (matiz y absorbancia)"},
+            {"N.º": 8, "Par de Variables": "malic_acid — hue", "r": "−0.561", "Lectura Enológica": "Negativa moderada (acidez málica frente al matiz)"},
+            {"N.º": 9, "Par de Variables": "alcohol — color_intensity", "r": "+0.546", "Lectura Enológica": "Positiva moderada (grado alcohólico y pigmentación)"},
+            {"N.º": 10, "Par de Variables": "flavanoids — hue", "r": "+0.543", "Lectura Enológica": "Positiva moderada (flavonoides y tonalidad cromática)"},
+        ]
+        st.dataframe(pd.DataFrame(tabla_3c_datos), use_container_width=True, hide_index=True)
+
+        st.markdown("""
+        <div style="background-color: #161922; border-left: 4px solid #38bdf8; border-radius: 4px; padding: 12px 16px; margin-top: 14px; margin-bottom: 18px;">
+            <div style="font-weight: 600; color: #38bdf8; font-size: 0.92rem; margin-bottom: 4px;">📌 Interpretación y Consecuencias Metodológicas:</div>
+            <div style="color: #cbd5e1; font-size: 0.85rem; line-height: 1.5;">
+                Las variables fenólicas (<code>total_phenols</code>, <code>flavanoids</code>, <code>od280/od315</code> y <code>proanthocyanins</code>) forman un <b>bloque fuertemente correlacionado</b>. Esto tiene dos consecuencias críticas:<br>
+                <b>(a) Redundancia de información:</b> Respalda plenamente reducir la dimensionalidad mediante <b>PCA</b> para sintetizar estas variables en componentes ortogonales.<br>
+                <b>(b) Peso en distancias euclídeas:</b> Al calcular distancias euclídeas sin transformar, este bloque aporta más peso conjunto que variables independientes como <code>ash</code>.<br>
+                <i>Nota importante:</i> Las correlaciones medidas describen asociación lineal estadística entre estas 178 muestras y no implican una relación de causalidad.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         st.subheader("Gráficos de dispersión de relaciones destacadas")
         st.caption("Dispersión bivariada con línea de tendencia lineal ajustada.")
@@ -521,17 +1043,51 @@ def pagina_eda():
             st.pyplot(fig_d2)
             plt.close(fig_d2)
 
-    # 6. Hallazgos Clave
+    # 6. Hallazgos Clave (Sección 3.3.7 del Informe)
     with pestanas[5]:
-        st.subheader("6. Síntesis de Hallazgos del EDA (para Informe)")
+        st.subheader("3.3.7 Síntesis de Hallazgos del EDA (Conclusiones Formales)")
         st.markdown(
-            """
-            * **Calidad de datos íntegra:** 178 registros completos, 0 valores nulos y 0 duplicados en las 13 variables químicas.
-            * **Escalas heterogéneas:** Se confirma una disparidad de órdenes de magnitud (`proline` y `magnesium` frente a `flavanoids` y `nonflavanoid_phenols`), lo que distorsionaría cualquier distancia euclídea sin un escalado previo.
-            * **Presencia de valores atípicos:** 7 de las 13 variables contienen valores fuera del rango intercuartílico $1.5 \\times IQR$, destacando `malic_acid` y `magnesium`.
-            * **Colinealidad moderada-alta:** Existe una fuerte asociación positiva entre `flavanoids` y `total_phenols` ($r = 0.86$), y entre `flavanoids` y `od280/od315` ($r = 0.79$), lo que anticipa una excelente compresión dimensional mediante PCA.
-            """
+            "Los resultados exploratorios sustentan las decisiones metodológicas de las fases subsiguientes de preprocesamiento y modelado:"
         )
+
+        col_h1, col_h2 = st.columns(2, gap="medium")
+        with col_h1:
+            st.markdown("""
+            <div style="background-color: #161922; border-left: 4px solid #38bdf8; border-radius: 6px; padding: 14px 16px; margin-bottom: 12px;">
+                <div style="font-weight: 700; color: #38bdf8; font-size: 0.95rem; margin-bottom: 4px;">1. Calidad Íntegra de Datos</div>
+                <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.5;">
+                    178 filas, 13 variables fisicoquímicas numéricas, <b>0 valores nulos y 0 duplicados</b>. No se requiere imputación ni codificación categórica.
+                </div>
+            </div>
+            <div style="background-color: #161922; border-left: 4px solid #f43f5e; border-radius: 6px; padding: 14px 16px; margin-bottom: 12px;">
+                <div style="font-weight: 700; color: #f43f5e; font-size: 0.95rem; margin-bottom: 4px;">2. Heterogeneidad Drástica de Escala</div>
+                <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.5;">
+                    Las variables difieren en varios órdenes de magnitud (σ de <code>proline</code> = 314.9 frente a 0.124 en <code>nonflavanoid_phenols</code>, razón <b>> 2,000×</b>). El <b>escalado es indispensable</b> para evitar que dos variables monopolicen las distancias.
+                </div>
+            </div>
+            <div style="background-color: #161922; border-left: 4px solid #a855f7; border-radius: 6px; padding: 14px 16px; margin-bottom: 12px;">
+                <div style="font-weight: 700; color: #c084fc; font-size: 0.95rem; margin-bottom: 4px;">3. Indicio Inicial de Estructura de Clústeres</div>
+                <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.5;">
+                    <code>flavanoids</code>, <code>total_phenols</code> y <code>od280/od315</code> sugieren <b>dos concentraciones bien diferenciadas de valores</b> (baja y alta madurez fenólica), anticipando la viabilidad de separar las muestras en grupos enológicos.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_h2:
+            st.markdown("""
+            <div style="background-color: #161922; border-left: 4px solid #fbbf24; border-radius: 6px; padding: 14px 16px; margin-bottom: 12px;">
+                <div style="font-weight: 700; color: #fbbf24; font-size: 0.95rem; margin-bottom: 4px;">4. Conservación Consciente de Atípicos</div>
+                <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.5;">
+                    Presentes en 7 variables, siempre por debajo del <b>2.25 %</b> (máx. 4 muestras por variable). Son vinos con perfiles intensos y biológicamente válidos; <b>se conservan en X</b> para que <b>DBSCAN</b> los audite como posible ruido.
+                </div>
+            </div>
+            <div style="background-color: #161922; border-left: 4px solid #34d399; border-radius: 6px; padding: 14px 16px; margin-bottom: 12px;">
+                <div style="font-weight: 700; color: #34d399; font-size: 0.95rem; margin-bottom: 4px;">5. Redundancia Colineal Justifica PCA</div>
+                <div style="color: #cbd5e1; font-size: 0.88rem; line-height: 1.5;">
+                    El bloque fenólico está fuertemente intercorrelacionado (<code>total_phenols</code> – <code>flavanoids</code>: r = +0.865). Esto respalda el uso de <b>PCA</b> para comprimir la dimensionalidad y proyectar la estructura geométrica en 2D y 3D.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # ------------------------------------------------------------- Preprocesamiento
@@ -569,12 +1125,12 @@ def pagina_preprocesamiento():
         dos estrategias fundamentales de estandarización:
         
         * **Decisión A: StandardScaler (Z-Score)**
-          $$z = \\frac{x - \\mu}{\\sigma}$$
-          Centra los datos con media $\\mu = 0$ y desviación estándar $\\sigma = 1$. Es el estándar óptimo para
+          $$z = \frac{x - \mu}{\sigma}$$
+          Centra los datos con media $\mu = 0$ y desviación estándar $\sigma = 1$. Es el estándar óptimo para
           algoritmos basados en distancias euclídeas y varianza (K-Means y PCA).
           
         * **Decisión B: RobustScaler (Mediana e IQR)**
-          $$z = \\frac{x - \\text{mediana}}{\\text{IQR}}$$
+          $$z = \frac{x - \text{mediana}}{\text{IQR}}$$
           Centra usando la mediana y escala con el rango intercuartílico ($Q_3 - Q_1$). Es inmune a la influencia
           de los outliers identificados en el EDA.
         """
@@ -743,7 +1299,37 @@ def pagina_kmeans():
             ax.fill_between(tabla_k["K"], tabla_k[col], alpha=0.15, color=color)
             ax.axvline(k_sugerido, color="#f87171", linestyle="--", alpha=0.85, linewidth=1.5, label=f"K óptimo = {k_sugerido}")
             val_opt = tabla_k.loc[tabla_k["K"] == k_sugerido, col].values[0]
-            ax.plot(k_sugerido, val_opt, marker="o", markersize=10, color=color, markeredgecolor="#ffffff", markeredgewidth=2)
+            ax.plot(k_sugerido, val_opt, marker="o", markersize=11, color=color, markeredgecolor="#ffffff", markeredgewidth=2.2)
+
+            # Etiquetar cada punto con su valor exacto como en el informe
+            y_vals = tabla_k[col].values
+            y_min, y_max = y_vals.min(), y_vals.max()
+            margin = (y_max - y_min) * 0.20 if y_max != y_min else 1.0
+            ax.set_ylim(y_min - margin * 0.25, y_max + margin * 0.55)
+
+            for x_val, y_val in zip(tabla_k["K"], y_vals):
+                if col == "Inertia":
+                    txt = f"{int(round(y_val))}"
+                elif col == "Calinski-Harabasz":
+                    txt = f"{y_val:.1f}"
+                else:
+                    txt = f"{y_val:.3f}"
+                es_optimo = (x_val == k_sugerido)
+                peso = "bold" if es_optimo else "normal"
+                color_txt = "#ffffff" if es_optimo else "#cbd5e1"
+                ax.annotate(
+                    txt,
+                    xy=(x_val, y_val),
+                    xytext=(0, 6),
+                    textcoords="offset points",
+                    ha="center",
+                    va="bottom",
+                    fontsize=7.8,
+                    fontweight=peso,
+                    color=color_txt,
+                    bbox=dict(boxstyle="round,pad=0.15", facecolor="#161922", edgecolor=color if es_optimo else "none", alpha=0.85)
+                )
+
             ax.set_title(titulo, fontsize=10.5, fontweight="bold", pad=8)
             ax.set_xlabel("Número de clústeres (K)", fontsize=9)
             ax.set_xticks(tabla_k["K"])
@@ -752,6 +1338,18 @@ def pagina_kmeans():
         plt.tight_layout(pad=2.2)
         st.pyplot(fig)
         plt.close(fig)
+
+        st.markdown('''
+        <div style="background-color: #161922; border-left: 4px solid #f43f5e; border-radius: 4px; padding: 12px 16px; margin-top: 10px; margin-bottom: 12px;">
+            <div style="font-weight: 600; color: #f43f5e; font-size: 0.92rem; margin-bottom: 4px;">📌 Interpretación de la Inercia y el Codo:</div>
+            <div style="color: #cbd5e1; font-size: 0.86rem; line-height: 1.5;">
+                La <b>inertia cae 380.8 unidades al pasar de K = 2 a K = 3</b> (de 1658.8 a 1277.9), pero solo 102.5 al pasar a K = 4 (1175.4); 
+                desde ahí cada clúster adicional reduce apenas entre 44 y 66 unidades. <b>El codo se ubica con claridad en K = 3</b>.<br>
+                Para el laboratorio esto significa que <b>tres perfiles químicos explican la mayor parte de la heterogeneidad de las muestras</b>; 
+                agregar más grupos apenas reduce la dispersión interna y fragmenta perfiles sin aportar diferenciación enológica nueva.
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
 
         st.dataframe(
             tabla_k.set_index("K").style.format({
@@ -794,21 +1392,89 @@ def pagina_kmeans():
         st.caption(f"Convergió en {n_iter} iteraciones. Cobertura: 100 % de los puntos (K-Means no produce ruido).")
 
         tamanos = pd.Series(labels).value_counts().sort_index()
-        tam_df = pd.DataFrame({"Clúster": tamanos.index, "Tamaño": tamanos.values,
-                               "%": (100 * tamanos.values / n).round(1)})
-        col_t, col_g = st.columns([1, 2])
-        col_t.dataframe(tam_df, hide_index=True, width="stretch")
-        fig, ax = plt.subplots(figsize=(6, 3))
-        ax.bar(tamanos.index.astype(str), tamanos.values, color=colores_clusters(k), edgecolor="black")
-        ax.set_xlabel("Clúster")
-        ax.set_ylabel("N.º de muestras")
-        ax.set_title("Tamaño de cada clúster", fontsize=11, fontweight="bold")
-        col_g.pyplot(fig)
-        plt.close(fig)
+
+        # Construir columnas de la tabla con la 4ta columna de características químicas (Tabla 6 del Informe)
+        filas_tabla = []
+        nombres_k3 = {
+            0: "0 · Ligeros, poco color y baja prolina",
+            1: "1 · Bajos en fenoles, color intenso y más ácidos",
+            2: "2 · Alto alcohol, prolina y fenoles",
+        }
+        caract_k3 = {
+            0: "alcohol 12.25 (12.25) · color_intensity 2.97 (2.90) · proline 510 (495) · magnesium 92.7 (88.0) · hue 1.06 (1.04) · flavanoids 2.05 (2.03)",
+            1: "flavanoids 0.82 (0.70) · od280/od315 1.70 (1.68) · hue 0.69 (0.67) · color_intensity 7.23 (7.30) · malic_acid 3.31 (3.27) · alcohol 13.13 (13.11)",
+            2: "proline 1100 (1072.5) · alcohol 13.68 (13.74) · flavanoids 3.00 (2.98) · total_phenols 2.85 (2.82) · magnesium 108.0 (105.5) · alcalinity_of_ash 17.46 (17.00)",
+        }
+
+        # Medias y medianas por clúster en unidades originales
+        medias_grp = X_raw.groupby(labels).mean()
+        medianas_grp = X_raw.groupby(labels).median()
+        global_mean = X_raw.mean()
+        global_std = X_raw.std()
+
+        for g in tamanos.index:
+            tam_g = int(tamanos[g])
+            pct_g = (tam_g / n) * 100
+            if k == 3 and g in nombres_k3:
+                nombre_g = nombres_k3[g]
+                caract_g = caract_k3[g]
+            else:
+                nombre_g = f"Clúster {g}"
+                # Calcular dinámicamente las 5 variables con mayor desviación para cualquier K
+                z_diff = ((medias_grp.loc[g] - global_mean) / global_std).abs().sort_values(ascending=False)
+                top_vars = z_diff.head(5).index
+                caract_g = " · ".join([f"{v} {medias_grp.loc[g, v]:.2f} ({medianas_grp.loc[g, v]:.2f})" for v in top_vars])
+
+            filas_tabla.append({
+                "Clúster": nombre_g,
+                "Tamaño": tam_g,
+                "%": f"{pct_g:.1f} %",
+                "Características químicas: media (mediana) en unidades originales": caract_g,
+            })
+
+        tam_df = pd.DataFrame(filas_tabla)
+
+        titulo_tabla = "**Tabla 6. Perfil y tamaño de los clústeres de K-Means (K = 3):**" if k == 3 else f"**Perfil y tamaño de los clústeres de K-Means (K = {k}):**"
+        st.markdown(titulo_tabla)
+
+        col_t, col_g = st.columns([1.75, 1.0], gap="large")
+        with col_t:
+            st.dataframe(
+                tam_df,
+                hide_index=True,
+                width="stretch",
+                column_config={
+                    "Clúster": st.column_config.TextColumn("Clúster", width="medium"),
+                    "Tamaño": st.column_config.NumberColumn("Tamaño", format="%d", width="small"),
+                    "%": st.column_config.TextColumn("%", width="small"),
+                    "Características químicas: media (mediana) en unidades originales": st.column_config.TextColumn(
+                        "Características químicas: media (mediana) en unidades originales",
+                        width="large"
+                    ),
+                },
+                height=(len(tam_df) + 1) * 42 + 20
+            )
+        with col_g:
+            fig, ax = plt.subplots(figsize=(5.5, 3.1))
+            etiquetas_barras = [f"C{g}" for g in tamanos.index]
+            bars = ax.bar(etiquetas_barras, tamanos.values, color=colores_clusters(k), edgecolor="#ffffff", linewidth=0.8, alpha=0.85)
+            ax.set_ylim(0, max(tamanos.values) * 1.25)
+            for bar, val in zip(bars, tamanos.values):
+                pct = (val / n) * 100
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.2,
+                        f"{val} ({pct:.1f}%)", ha="center", va="bottom", fontsize=8.8, fontweight="bold", color="#ffffff")
+            ax.set_xlabel("Clúster")
+            ax.set_ylabel("N.º de muestras")
+            ax.set_title("Tamaño y Proporción (K-Means)", fontsize=10.5, fontweight="bold")
+            ax.grid(axis="y", linestyle="--", alpha=0.3)
+            plt.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
 
         st.session_state["labels_kmeans"] = labels
         st.session_state["kmeans_params"] = {"K": k, "n_init": N_INIT, "random_state": RANDOM_STATE, "init": "k-means++"}
         st.session_state["kmeans_metricas"] = {"Inertia": inertia, **(met or {})}
+        st.session_state["kmeans_centros"] = centros
 
     # 3. Perfil
     with tab_perf:
@@ -912,14 +1578,32 @@ def pagina_dbscan():
         kdist = distancias_k(X, min_samples)
         pct_nucleo = 100 * (kdist <= eps).mean()
         fig, ax = plt.subplots(figsize=(9, 4.5))
-        ax.plot(np.arange(1, n + 1), kdist, color="#38bdf8", linewidth=2.4)
+        ax.plot(np.arange(1, n + 1), kdist, color="#38bdf8", linewidth=2.4, label="Distancia k-vecino")
         ax.fill_between(np.arange(1, n + 1), kdist, alpha=0.15, color="#38bdf8")
         ax.axhline(eps, color="#f43f5e", linestyle="--", linewidth=1.8, label=f"eps actual = {eps:.2f}")
+        
+        # Marcar punto de cruce con anotación numérica
+        idx_cruce = int(np.searchsorted(kdist, eps))
+        if 0 <= idx_cruce < n:
+            val_cruce = kdist[idx_cruce]
+            ax.plot(idx_cruce + 1, val_cruce, marker="o", markersize=10, color="#f43f5e", markeredgecolor="#ffffff", markeredgewidth=1.8)
+            ax.annotate(
+                f"Punto corte: muestra #{idx_cruce + 1} (d = {val_cruce:.2f})\n{pct_nucleo:.1f}% puntos núcleo (≤ eps)",
+                xy=(idx_cruce + 1, val_cruce),
+                xytext=(-50, 22),
+                textcoords="offset points",
+                fontsize=8.5,
+                fontweight="bold",
+                color="#ffffff",
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="#161922", edgecolor="#f43f5e", alpha=0.9),
+                arrowprops=dict(arrowstyle="->", color="#f43f5e", lw=1.3)
+            )
+
         ax.set_xlabel("Puntos ordenados por distancia")
         ax.set_ylabel(f"Distancia al {min_samples - 1}.º vecino más cercano")
         ax.set_title(f"k-distance (min_samples = {min_samples})", fontsize=11, fontweight="bold")
         ax.grid(True, linestyle="--", alpha=0.4)
-        ax.legend()
+        ax.legend(loc="upper left")
         st.pyplot(fig)
         plt.close(fig)
         p50, p75, p90 = np.percentile(kdist, [50, 75, 90])
@@ -964,7 +1648,25 @@ def pagina_dbscan():
             "Tamaño": tamanos.values,
             "%": (100 * tamanos.values / n).round(1),
         })
-        st.dataframe(tam_df, hide_index=True, width="stretch")
+        col_tdb, col_gdb = st.columns([1, 2])
+        col_tdb.dataframe(tam_df, hide_index=True, width="stretch")
+
+        fig, ax = plt.subplots(figsize=(6, 3.2))
+        colores_barras_db = ["#f87171" if g == -1 else colores_clusters(n_clusters)[g] for g in tamanos.index]
+        etiquetas_x = ["Ruido (-1)" if g == -1 else f"C{g}" for g in tamanos.index]
+        bars_db = ax.bar(etiquetas_x, tamanos.values, color=colores_barras_db, edgecolor="#ffffff", linewidth=0.8, alpha=0.85)
+        ax.set_ylim(0, max(tamanos.values) * 1.22)
+        for bar, val in zip(bars_db, tamanos.values):
+            pct = (val / n) * 100
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.2,
+                    f"{val} ({pct:.1f}%)", ha="center", va="bottom", fontsize=8.8, fontweight="bold", color="#ffffff")
+        ax.set_xlabel("Grupo / Clúster")
+        ax.set_ylabel("N.º de muestras")
+        ax.set_title("Tamaño y Proporción de Grupos DBSCAN", fontsize=10.5, fontweight="bold")
+        ax.grid(axis="y", linestyle="--", alpha=0.3)
+        plt.tight_layout()
+        col_gdb.pyplot(fig)
+        plt.close(fig)
 
     # 3. Sensibilidad
     with tab_sens:
@@ -1049,20 +1751,46 @@ def pagina_pca():
         st.subheader("Scree Plot y Varianza Acumulada")
         n_comp = st.slider("Número de componentes a mostrar en el gráfico", 2, 13, 10)
         
-        fig, ax1 = plt.subplots(figsize=(9, 4.5))
-        ax1.bar(range(1, n_comp + 1), varianza_exp[:n_comp], alpha=0.75, color="#f43f5e", edgecolor="#ffffff", linewidth=0.5, label="Varianza Individual")
-        ax1.set_xlabel("Componente Principal")
-        ax1.set_ylabel("Proporción de Varianza Explicada", color="#f43f5e")
+        fig, ax1 = plt.subplots(figsize=(9.5, 4.8))
+        v_ind_pct = varianza_exp[:n_comp] * 100
+        v_acum_pct = varianza_acum[:n_comp] * 100
+
+        bars = ax1.bar(range(1, n_comp + 1), v_ind_pct, alpha=0.75, color="#f43f5e", edgecolor="#ffffff", linewidth=0.5, label="Varianza Individual (%)")
+        ax1.set_ylim(0, max(v_ind_pct) * 1.25)
+        for bar, val in zip(bars, v_ind_pct):
+            ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.6,
+                     f"{val:.1f}%", ha="center", va="bottom", fontsize=8, fontweight="bold", color="#fca5a5")
+        
+        ax1.set_xlabel("Componente Principal", fontsize=9.5)
+        ax1.set_ylabel("Proporción de Varianza Explicada (%)", color="#f43f5e", fontsize=9.5)
         ax1.tick_params(axis='y', labelcolor="#f43f5e")
         ax1.set_xticks(range(1, n_comp + 1))
+        ax1.set_xticklabels([f"PC{i}" for i in range(1, n_comp + 1)], fontsize=8.5)
         
         ax2 = ax1.twinx()
-        ax2.plot(range(1, n_comp + 1), varianza_acum[:n_comp], marker="o", color="#38bdf8", linewidth=2.4, label="Varianza Acumulada")
-        ax2.set_ylabel("Varianza Acumulada", color="#38bdf8")
-        ax2.tick_params(axis='y', labelcolor="#38bdf8")
-        ax2.axhline(0.80, color="#94a3b8", linestyle="--", alpha=0.6, label="Umbral 80%")
+        ax2.plot(range(1, n_comp + 1), v_acum_pct, marker="o", color="#38bdf8", linewidth=2.4, markersize=6.5, label="Varianza Acumulada (%)")
+        ax2.set_ylim(0, 110)
+        ax2.axhline(80.0, color="#fbbf24", linestyle="--", alpha=0.75, linewidth=1.4, label="Umbral 80% (5 CPs)")
         
-        fig.suptitle("Scree Plot: Varianza por Componente", fontweight="bold", color="#f0f2f6")
+        for x_i, y_i in zip(range(1, n_comp + 1), v_acum_pct):
+            es_clave = (x_i in [2, 3, 5])
+            ax2.annotate(
+                f"{y_i:.1f}%",
+                xy=(x_i, y_i),
+                xytext=(0, 7),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=8.2,
+                fontweight="bold" if es_clave else "normal",
+                color="#ffffff" if es_clave else "#38bdf8",
+                bbox=dict(boxstyle="round,pad=0.15", facecolor="#161922", edgecolor="#38bdf8" if es_clave else "none", alpha=0.8)
+            )
+
+        ax2.set_ylabel("Varianza Acumulada (%)", color="#38bdf8", fontsize=9.5)
+        ax2.tick_params(axis='y', labelcolor="#38bdf8")
+        fig.suptitle("Figura 10. Scree Plot: Varianza Explicada Individual y Acumulada", fontweight="bold", color="#f0f2f6", fontsize=11)
+        plt.tight_layout()
         st.pyplot(fig)
         plt.close(fig)
 
@@ -1152,22 +1880,46 @@ def pagina_pca():
         elif color_por != "Ninguno":
             st.warning(f"Primero debes ejecutar el modelo {color_por} en su sección correspondiente.")
 
-        fig, ax = plt.subplots(figsize=(8, 5.5))
-        if color_array is not None:
-            # Mapeo de colores
-            unique_labels = np.unique(color_array)
-            cmap = plt.get_cmap("tab10")
-            for lbl in unique_labels:
-                mask = color_array == lbl
-                color = "gray" if lbl == 99 else cmap(lbl % 10)
-                marker = "x" if lbl == 99 else "o"
-                label_name = "Ruido (-1)" if lbl == 99 else f"Clúster {lbl}"
-                ax.scatter(coords[mask, 0], coords[mask, 1], c=[color], marker=marker, 
-                           edgecolors="black" if lbl != 99 else None, linewidth=0.4,
-                           alpha=0.7, s=45, label=label_name)
-            ax.legend()
+        fig, ax = plt.subplots(figsize=(8.5, 5.6))
+        if color_por == "K-Means" and labels_km is not None:
+            k_val = len(np.unique(labels_km))
+            paleta = colores_clusters(k_val)
+            for i in range(k_val):
+                mask = (labels_km == i)
+                n_count = int(mask.sum())
+                ax.scatter(coords[mask, 0], coords[mask, 1], color=paleta[i], edgecolors="#ffffff",
+                           linewidth=0.5, alpha=0.85, s=50, label=f"Clúster {i} (n={n_count})")
+            
+            # Obtener y proyectar centroides a 2D en PC1-PC2
+            centros_raw = st.session_state.get("kmeans_centros", None)
+            if centros_raw is None or len(centros_raw) != k_val:
+                centros_raw = np.array([X[labels_km == i].mean(axis=0) for i in range(k_val)])
+            centros_2d = pca_full.transform(centros_raw)[:, :2]
+            ax.scatter(centros_2d[:, 0], centros_2d[:, 1], marker="X", s=220, color="#ffffff",
+                       edgecolors="#f43f5e", linewidth=1.8, label="Centroides", zorder=5)
+            for i_c, (cx, cy) in enumerate(centros_2d):
+                ax.annotate(f"C{i_c}", (cx, cy), xytext=(7, 7), textcoords="offset points",
+                            fontsize=9, fontweight="bold", color="#ffffff",
+                            bbox=dict(boxstyle="round,pad=0.2", facecolor="#161922", edgecolor="#f43f5e", alpha=0.9))
+            ax.legend(loc="best", fontsize=8.5, framealpha=0.75)
+
+        elif color_por == "DBSCAN" and labels_db is not None:
+            ruido = (labels_db == -1)
+            n_ruido = int(ruido.sum())
+            if n_ruido > 0:
+                ax.scatter(coords[ruido, 0], coords[ruido, 1], marker="x", color="#f87171", s=50,
+                           linewidth=1.5, label=f"Ruido -1 (n={n_ruido})")
+            unique_clusters = sorted([c for c in set(labels_db) if c != -1])
+            paleta = colores_clusters(len(unique_clusters)) if unique_clusters else []
+            for idx_c, c_id in enumerate(unique_clusters):
+                mask = (labels_db == c_id)
+                n_count = int(mask.sum())
+                ax.scatter(coords[mask, 0], coords[mask, 1], color=paleta[idx_c], edgecolors="#ffffff",
+                           linewidth=0.5, alpha=0.85, s=50, label=f"Clúster {c_id} (n={n_count})")
+            ax.legend(loc="best", fontsize=8.5, framealpha=0.75)
         else:
-            ax.scatter(coords[:, 0], coords[:, 1], color="#722f37", edgecolors="black", linewidth=0.4, alpha=0.7, s=45)
+            ax.scatter(coords[:, 0], coords[:, 1], color="#38bdf8", edgecolors="#ffffff", linewidth=0.5, alpha=0.75, s=50, label="Muestras de vino (N=178)")
+            ax.legend(loc="best", fontsize=8.5, framealpha=0.75)
 
         ax.set_xlabel(f"PC1 ({varianza_exp[0]:.1%} varianza)")
         ax.set_ylabel(f"PC2 ({varianza_exp[1]:.1%} varianza)")
@@ -1250,10 +2002,17 @@ def pagina_comparacion():
     with col1:
         st.markdown("**Distribución de Clústeres (K-Means)**")
         tam_km = pd.Series(labels_km).value_counts().sort_index()
-        fig, ax = plt.subplots(figsize=(6, 3))
-        ax.bar(tam_km.index.astype(str), tam_km.values, color=colores_clusters(n_clusters_km), edgecolor="black")
+        fig, ax = plt.subplots(figsize=(6, 3.2))
+        bars_km = ax.bar(tam_km.index.astype(str), tam_km.values, color=colores_clusters(n_clusters_km), edgecolor="#ffffff", linewidth=0.8, alpha=0.85)
+        ax.set_ylim(0, max(tam_km.values) * 1.22)
+        for bar, val in zip(bars_km, tam_km.values):
+            pct = (val / len(labels_km)) * 100
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.2,
+                    f"{val} ({pct:.1f}%)", ha="center", va="bottom", fontsize=8.8, fontweight="bold", color="#ffffff")
         ax.set_xlabel("Clúster")
         ax.set_ylabel("N.º de muestras")
+        ax.grid(axis="y", linestyle="--", alpha=0.3)
+        plt.tight_layout()
         st.pyplot(fig)
         plt.close(fig)
         
@@ -1261,11 +2020,18 @@ def pagina_comparacion():
         st.markdown("**Distribución de Clústeres (DBSCAN)**")
         tam_db = pd.Series(labels_db).value_counts().sort_index()
         labels_x = ["Ruido (-1)" if i == -1 else f"C{i}" for i in tam_db.index]
-        colors_db = ["gray" if i == -1 else colores_clusters(n_clusters_db)[i] for i in tam_db.index]
-        fig, ax = plt.subplots(figsize=(6, 3))
-        ax.bar(labels_x, tam_db.values, color=colors_db, edgecolor="black")
+        colors_db = ["#f87171" if i == -1 else colores_clusters(n_clusters_db)[i] for i in tam_db.index]
+        fig, ax = plt.subplots(figsize=(6, 3.2))
+        bars_db = ax.bar(labels_x, tam_db.values, color=colors_db, edgecolor="#ffffff", linewidth=0.8, alpha=0.85)
+        ax.set_ylim(0, max(tam_db.values) * 1.22)
+        for bar, val in zip(bars_db, tam_db.values):
+            pct = (val / len(labels_db)) * 100
+            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.2,
+                    f"{val} ({pct:.1f}%)", ha="center", va="bottom", fontsize=8.8, fontweight="bold", color="#ffffff")
         ax.set_xlabel("Grupo")
         ax.set_ylabel("N.º de muestras")
+        ax.grid(axis="y", linestyle="--", alpha=0.3)
+        plt.tight_layout()
         st.pyplot(fig)
         plt.close(fig)
 
