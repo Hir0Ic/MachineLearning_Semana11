@@ -1120,7 +1120,7 @@ def pagina_preprocesamiento():
     # Paso 2: Comparación de decisiones de preparación
     st.subheader("Paso 2: Comparación de dos decisiones de preparación de datos")
     st.markdown(
-        """
+        r"""
         Dado que el EDA evidenció tanto **escalas dispares** como **presencia de valores atípicos**, se comparan
         dos estrategias fundamentales de estandarización:
         
@@ -2140,20 +2140,20 @@ def pagina_conclusiones():
         st.subheader("Las 5 Conclusiones Centrales del Proyecto")
         st.markdown(
             r"""
-            1. **Descubrimiento de una estructura natural tripartita en los vinos:**
-               El análisis del método del codo (Inertia = 1,277.9) y el coeficiente de Silhouette (máximo global en $K = 3$ con 0.285) demostraron cuantitativamente que las 13 variables fisicoquímicas contienen información suficiente para segregar las 178 muestras en **tres perfiles químicos diferenciados**, mostrando un solapamiento inter-clúster moderado (Silhouette = 0.285) donde 172 de las 178 muestras (96.6%) corresponden al cultivar dominante de cada clúster.
+            1. **$K = 3$ es la mejor opción:**  
+               El codo y las tres métricas coinciden. Los grupos se solapan un poco (Silhouette 0.285), y 172 de 178 vinos (96.6 %) caen en un grupo dominado por un solo cultivar.
 
-            2. **Efectividad de la reducción dimensional mediante PCA:**
-               La descomposición en componentes principales reveló una alta redundancia en el espacio original: los dos primeros componentes explican el **55.4%** de la varianza total (PC1 con 36.2% dominado por flavonoides y fenoles totales; PC2 con 19.2% dominado por color y alcohol), mientras que con **3 componentes se alcanza el 66.5%**, permitiendo una representación visual fidedigna sin pérdida crítica de información.
+            2. **Las variables se parecen entre sí (PCA):**  
+               Con solo 2 ejes de PCA conservamos el 55.4 % de la información, y con 3, el 66.5 %. Por eso los gráficos en 2D sirven para ver, pero no muestran todo.
 
-            3. **Aislamiento eficaz de anomalías fisicoquímicas con DBSCAN:**
-               DBSCAN demostró ser una potente herramienta de auditoría de calidad al clasificar **42 muestras (23.6%) como ruido (-1)**. El análisis estadístico evidenció que estas muestras poseen un valor $|z|$ extremo superior al promedio del dataset, reuniendo vinos con acidez málica desmedida o concentraciones inusuales de magnesio correspondientes a los atípicos detectados en el EDA.
+            3. **DBSCAN detecta muestras raras:**  
+               Marcó 42 muestras como ruido (23.6 %), incluidas 13 de las 17 con valores atípicos. Son muestras para revisar, no vinos defectuosos.
 
-            4. **Impacto determinante de la estandarización multivariada:**
-               El preprocesamiento mediante `StandardScaler` ($\mu = 0, \sigma = 1$) resultó mandatorio. Variables como `proline` (con rango original de 1,402) habrían dominado desproporcionadamente la suma de distancias euclídeas de no haber sido escaladas. La normalización otorgó un peso equitativo a marcadores traza como los flavonoides, garantizando una segmentación basada en la identidad química global del vino.
+            4. **Estandarizar fue necesario:**  
+               Sin hacerlo, la prolina, con números muy grandes, habría dominado los grupos. Ahora todas las variables pesan igual.
 
-            5. **Sinergia metodológica para la industria vitivinícola:**
-               Ningún algoritmo reemplaza al otro: **K-Means** es el método óptimo para la **segmentación comercial total** (cobertura del 100% de los lotes para catálogo de venta), mientras que **DBSCAN** es insustituible en el **control de calidad de laboratorio** (para descartar lotes defectuosos o vendimias anómalas antes del envasado).
+            5. **Los dos métodos se complementan:**  
+               K-Means clasifica el 100 % de los vinos y DBSCAN señala los que conviene revisar. Falta validarlo con más datos.
             """
         )
 
@@ -2161,15 +2161,15 @@ def pagina_conclusiones():
     with pestanas[2]:
         st.subheader("Limitaciones Técnicas del Estudio (3)")
         st.markdown(
-            """
-            * ⚠️ **Limitación 1: Supuestos de esfericidad e isometría en K-Means:**
-              K-Means impone particiones convexas y esféricas en el espacio multidimensional. Aquellas muestras ubicadas en los límites difusos entre cultivares son forzadas a un centroide, ignorando la incertidumbre de frontera.
+            r"""
+            * ⚠️ **Limitación 1: Supuesto de forma en K-Means:**  
+              K-Means asume grupos compactos y esféricos, y obliga a asignar cada muestra a un solo centroide. Con una Silhouette de 0.285 hay solapamiento moderado, por lo que las muestras de frontera se asignan a un perfil sin reflejar su incertidumbre.
 
-            * ⚠️ **Limitación 2: Sensibilidad de DBSCAN ante densidades variables en alta dimensión:**
-              En un espacio de 13 dimensiones, el fenómeno de la "maldición de la dimensionalidad" dispersa las distancias relativas. Por ello, una variación leve en el parámetro `eps` (por ejemplo, de 2.30 a 2.50) provoca que los clústeres se fusionen masivamente o que el ruido aumente drásticamente, exigiendo una calibración empírica minuciosa del gráfico k-distance.
+            * ⚠️ **Limitación 2: Sensibilidad de DBSCAN en 13 dimensiones:**  
+              Con muchas variables las distancias entre muestras tienden a parecerse, y no hay un umbral de densidad claro. Un cambio pequeño de eps altera el resultado: con $\varepsilon = 2.3$ se obtienen 2 clústeres, con 2.5 solo uno, y con 2.0 el ruido sube al 47.8 %. Además, sus métricas se calculan sin el ruido, lo que limita compararlas con las de K-Means.
 
-            * ⚠️ **Limitación 3: Tamaño y representatividad geográfica de la muestra:**
-              El conjunto de datos consta de 178 registros correspondientes a tres variedades cultivadas en una región específica de Italia en 1992. Los umbrales numéricos obtenidos no pueden extrapolarse directamente a vinos de climas tropicales o del nuevo mundo sin un reentrenamiento con lotes contemporáneos locales.
+            * ⚠️ **Limitación 3: Tamaño y alcance del dataset:**  
+              Son 178 muestras de una sola región de Italia y tres cultivares, con datos de 1991 y unidades de medida no documentadas. Los valores observados no deben aplicarse a otras regiones o vinos actuales sin recalibrar.
             """
         )
 
@@ -2177,15 +2177,15 @@ def pagina_conclusiones():
     with pestanas[3]:
         st.subheader("Recomendaciones Metodológicas y Prácticas (3)")
         st.markdown(
-            """
-            * 💡 **Recomendación 1: Implementación de un pipeline de dos fases en planta enológica:**
-              Se recomienda adoptar un flujo operativo en cascada: primero, someter los lotes entrantes a **DBSCAN** para identificar y separar anomalías y defectos; segundo, clasificar los lotes aprobados mediante **K-Means** ($K=3$) para asignar su línea comercial (Crianza, Joven, Varietal).
+            r"""
+            * 💡 **Recomendación 1: Usar los métodos en cascada, tras validarlos:**  
+              Aplicar DBSCAN como primer filtro para detectar muestras atípicas y K-Means con $K = 3$ sobre las restantes para asignarlas a uno de los tres perfiles. Antes de usarlo en un laboratorio, validar el procedimiento con más muestras y con la revisión de un experto sobre las marcadas como ruido.
 
-            * 💡 **Recomendación 2: Ejecución de clustering sobre el espacio latente de PCA:**
-              Para optimizar la velocidad y estabilidad de algoritmos basados en densidad, se sugiere proyectar previamente las 13 variables sobre las primeras 3 componentes principales (66.5% varianza) antes de aplicar DBSCAN, eliminando el ruido residual de las variables poco informativas.
+            * 💡 **Recomendación 2: Evaluar DBSCAN sobre componentes principales:**  
+              Probar DBSCAN sobre PC1-PC3 (66.5 % de la varianza) y comparar su estabilidad con la obtenida con las 13 variables, verificando que no se pierda información relevante.
 
-            * 💡 **Recomendación 3: Incorporación de variables organolépticas y climáticas:**
-              Complementar los parámetros de laboratorio con variables sensoriales obtenidas por paneles de cata profesionales (astringencia percibida, persistencia aromática) y metadatos de añada (horas de sol, régimen de lluvias) para enriquecer la interpretabilidad comercial de los clústeres.
+            * 💡 **Recomendación 3: Ampliar y enriquecer los datos:**  
+              Incorporar muestras de otras regiones y cosechas con unidades documentadas, y variables sensoriales (notas de cata, acidez percibida) y climáticas de la añada.
             """
         )
 
