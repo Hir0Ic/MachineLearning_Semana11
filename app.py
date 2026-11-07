@@ -1286,6 +1286,33 @@ def pagina_kmeans():
 
     # 1. Selección de K
     with tab_sel:
+        st.subheader("¿Qué mide cada métrica?")
+        st.caption("Cuatro formas distintas de responder la misma pregunta: ¿qué tan bien separados están los grupos?")
+        guia_metricas = [
+            ("📉 Inercia", "#f43f5e", "Menor es mejor ↓",
+             "Mide qué tan <b>apretado</b> está cada grupo: suma la distancia de cada vino al centro de su grupo.",
+             "Siempre baja al agregar grupos, por eso no se busca el mínimo sino el <b>codo</b>: el punto donde deja de bajar mucho."),
+            ("🟢 Silhouette", "#34d399", "Mayor es mejor ↑ · rango −1 a 1",
+             "Pregunta a cada vino: <i>¿estás más cerca de tu grupo que del grupo vecino?</i> y promedia las respuestas.",
+             "Cerca de 1 = grupos bien separados · cerca de 0 = grupos que se tocan · negativo = vinos mal asignados."),
+            ("🔵 Davies-Bouldin", "#60a5fa", "Menor es mejor ↓ · mínimo 0",
+             "Compara cada grupo con el grupo <b>más parecido</b> a él: cuánto se dispersan frente a qué tan lejos están sus centros.",
+             "Valor bajo = cada grupo es compacto y está lejos de los demás. 0 sería la separación perfecta."),
+            ("🟡 Calinski-Harabasz", "#fbbf24", "Mayor es mejor ↑ · sin tope",
+             "Divide la <b>separación entre grupos</b> por la <b>dispersión dentro de los grupos</b>.",
+             "Valor alto = grupos muy distintos entre sí y homogéneos por dentro. Solo se compara entre distintos K."),
+        ]
+        cols_guia = st.columns(4)
+        for col_g, (nombre, color, regla, que_mide, como_leer) in zip(cols_guia, guia_metricas):
+            col_g.markdown(f'''
+            <div style="background-color: #161922; border-top: 3px solid {color}; border-radius: 6px; padding: 12px 14px; height: 100%; min-height: 230px;">
+                <div style="font-weight: 700; color: {color}; font-size: 0.95rem;">{nombre}</div>
+                <div style="color: #94a3b8; font-size: 0.75rem; margin-bottom: 8px;">{regla}</div>
+                <div style="color: #e2e8f0; font-size: 0.83rem; line-height: 1.45; margin-bottom: 6px;">{que_mide}</div>
+                <div style="color: #94a3b8; font-size: 0.8rem; line-height: 1.4;">{como_leer}</div>
+            </div>
+            ''', unsafe_allow_html=True)
+
         st.subheader("Curva del codo y métricas internas por K")
         fig, axes = plt.subplots(2, 2, figsize=(12, 7.5))
         series = [
@@ -1339,14 +1366,47 @@ def pagina_kmeans():
         st.pyplot(fig)
         plt.close(fig)
 
-        st.markdown('''
+        # Interpretación en lenguaje simple, calculada a partir de tabla_k
+        fila_k = tabla_k.set_index("K")
+        ks = list(fila_k.index)
+        ks_k = k_sugerido
+        inercia = fila_k["Inertia"]
+        if ks_k - 1 in ks and ks_k + 1 in ks:
+            caida_antes = inercia[ks_k - 1] - inercia[ks_k]
+            caida_despues = inercia[ks_k] - inercia[ks_k + 1]
+            txt_codo = (
+                f"Pasar de {ks_k - 1} a {ks_k} grupos reduce la inercia en <b>{caida_antes:.0f}</b>, "
+                f"pero pasar de {ks_k} a {ks_k + 1} solo la reduce en <b>{caida_despues:.0f}</b>. "
+                f"La curva se \"dobla\" en K = {ks_k}: a partir de ahí, más grupos casi no mejoran nada."
+            )
+        else:
+            txt_codo = f"La curva de inercia se aplana alrededor de K = {ks_k}."
+
+        sil = fila_k.loc[ks_k, "Silhouette"]
+        if sil >= 0.5:
+            nivel_sil = "grupos claramente separados"
+        elif sil >= 0.25:
+            nivel_sil = "grupos razonablemente separados, aunque con algo de solapamiento en los bordes"
+        else:
+            nivel_sil = "grupos débiles, muy solapados"
+        k_db = int(fila_k["Davies-Bouldin"].idxmin())
+        k_ch = int(fila_k["Calinski-Harabasz"].idxmax())
+
+        def _acuerdo(k_metrica):
+            return "✅ coincide" if k_metrica == ks_k else f"⚠️ prefiere K = {k_metrica}"
+
+        st.markdown(f'''
         <div style="background-color: #161922; border-left: 4px solid #f43f5e; border-radius: 4px; padding: 12px 16px; margin-top: 10px; margin-bottom: 12px;">
-            <div style="font-weight: 600; color: #f43f5e; font-size: 0.92rem; margin-bottom: 4px;">📌 Interpretación de la Inercia y el Codo:</div>
-            <div style="color: #cbd5e1; font-size: 0.86rem; line-height: 1.5;">
-                La <b>inertia cae 380.8 unidades al pasar de K = 2 a K = 3</b> (de 1658.8 a 1277.9), pero solo 102.5 al pasar a K = 4 (1175.4); 
-                desde ahí cada clúster adicional reduce apenas entre 44 y 66 unidades. <b>El codo se ubica con claridad en K = 3</b>.<br>
-                Para el laboratorio esto significa que <b>tres perfiles químicos explican la mayor parte de la heterogeneidad de las muestras</b>; 
-                agregar más grupos apenas reduce la dispersión interna y fragmenta perfiles sin aportar diferenciación enológica nueva.
+            <div style="font-weight: 600; color: #f43f5e; font-size: 0.92rem; margin-bottom: 6px;">📌 ¿Qué nos dicen los gráficos?</div>
+            <ul style="color: #cbd5e1; font-size: 0.86rem; line-height: 1.55; margin: 0 0 6px 0; padding-left: 18px;">
+                <li><b style="color:#f43f5e;">Inercia:</b> {txt_codo}</li>
+                <li><b style="color:#34d399;">Silhouette:</b> el valor más alto es {sil:.3f} en K = {ks_k} → {nivel_sil}.</li>
+                <li><b style="color:#60a5fa;">Davies-Bouldin:</b> el mejor (más bajo) está en K = {k_db} ({fila_k.loc[k_db, "Davies-Bouldin"]:.3f}) → {_acuerdo(k_db)}.</li>
+                <li><b style="color:#fbbf24;">Calinski-Harabasz:</b> el mejor (más alto) está en K = {k_ch} ({fila_k.loc[k_ch, "Calinski-Harabasz"]:.1f}) → {_acuerdo(k_ch)}.</li>
+            </ul>
+            <div style="color: #e2e8f0; font-size: 0.88rem; line-height: 1.5;">
+                <b>En resumen:</b> los vinos se agrupan de forma natural en <b>{ks_k} perfiles químicos</b>.
+                Crear más grupos solo partiría esos perfiles en pedazos sin descubrir tipos de vino realmente nuevos.
             </div>
         </div>
         ''', unsafe_allow_html=True)
@@ -1383,10 +1443,14 @@ def pagina_kmeans():
         met, motivo = metricas_internas(X, labels)
 
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Inertia", f"{inertia:.1f}")
-        c2.metric("Silhouette", f"{met['Silhouette']:.3f}" if met else "No calculable")
-        c3.metric("Davies-Bouldin", f"{met['Davies-Bouldin']:.3f}" if met else "No calculable")
-        c4.metric("Calinski-Harabasz", f"{met['Calinski-Harabasz']:.1f}" if met else "No calculable")
+        c1.metric("Inertia", f"{inertia:.1f}",
+                  help="Qué tan apretados están los grupos (suma de distancias al centro). Menor es mejor, pero siempre baja al subir K.")
+        c2.metric("Silhouette", f"{met['Silhouette']:.3f}" if met else "No calculable",
+                  help="¿Cada vino está más cerca de su grupo que del vecino? Rango −1 a 1. Mayor es mejor.")
+        c3.metric("Davies-Bouldin", f"{met['Davies-Bouldin']:.3f}" if met else "No calculable",
+                  help="Qué tanto se parece cada grupo a su grupo más similar. Menor es mejor (0 = ideal).")
+        c4.metric("Calinski-Harabasz", f"{met['Calinski-Harabasz']:.1f}" if met else "No calculable",
+                  help="Separación entre grupos ÷ dispersión dentro de los grupos. Mayor es mejor.")
         if motivo:
             st.warning(f"Métricas no calculables: {motivo}.")
         st.caption(f"Convergió en {n_iter} iteraciones. Cobertura: 100 % de los puntos (K-Means no produce ruido).")
@@ -1538,13 +1602,23 @@ def pagina_kmeans():
 
 
 # ------------------------------------------------------------------- DBSCAN
+def caja_explicacion(titulo: str, color: str, cuerpo_html: str):
+    """Recuadro oscuro con borde de color para explicaciones en lenguaje simple."""
+    st.markdown(f'''
+    <div style="background-color: #161922; border-left: 4px solid {color}; border-radius: 4px; padding: 12px 16px; margin-top: 10px; margin-bottom: 12px;">
+        <div style="font-weight: 600; color: {color}; font-size: 0.92rem; margin-bottom: 6px;">{titulo}</div>
+        <div style="color: #cbd5e1; font-size: 0.86rem; line-height: 1.55;">{cuerpo_html}</div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+
 def pagina_dbscan():
     st.header("🔬 Agrupamiento DBSCAN")
     X_final, X_raw, vars_x, scaler = matriz_para_clustering()
     if X_final is None:
         return
     X = X_final.to_numpy()
-    n = X.shape[0]
+    n, d = X.shape
 
     st.markdown(
         "DBSCAN agrupa por densidad con distancia **euclídea**: un punto es núcleo si tiene al menos "
@@ -1552,10 +1626,40 @@ def pagina_dbscan():
         "desde un núcleo se marcan como **ruido (-1)**."
     )
 
+    caja_explicacion("🧭 Los dos parámetros, en simple", "#38bdf8", f'''
+        Imagina que cada vino es una persona en una sala. Alrededor de cada uno dibujamos un círculo:
+        <ul style="margin: 6px 0; padding-left: 18px;">
+            <li><b>eps</b> = el <b>tamaño del círculo</b> (qué tan cerca deben estar dos vinos para ser "vecinos").</li>
+            <li><b>min_samples</b> = <b>cuántos vecinos</b> debe haber dentro del círculo para decir "aquí hay un grupo".</li>
+        </ul>
+        Si un vino tiene suficientes vecinos es <b>núcleo</b>; si está pegado a un núcleo pero no tiene suficientes vecinos es <b>borde</b>;
+        si no está cerca de ningún núcleo es <b>ruido (-1)</b>: un vino "raro" que no encaja en ningún grupo.
+    ''')
+
+    with st.expander(f"❓ ¿Por qué eps = {EPS_DEFECTO} y min_samples = {MIN_SAMPLES_DEFECTO}?", expanded=False):
+        st.markdown(f'''
+**min_samples = {MIN_SAMPLES_DEFECTO}**
+- La regla clásica dice usar **2 × n.º de variables** = 2 × {d} = **{2 * d}**. Pero con solo {n} vinos, cada núcleo
+  necesitaría {2 * d} vecinos cerca (≈ {100 * 2 * d / n:.0f} % de toda la muestra): demasiado exigente, casi nadie sería núcleo.
+- Valores muy bajos (3–4) hacen lo contrario: cualquier grupito de 3 vinos ya es un clúster y aparecen muchos
+  microgrupos sin sentido (ver pestaña **3. Sensibilidad**: con eps bajo salen 8–9 clústeres).
+- **{MIN_SAMPLES_DEFECTO}** es el valor por defecto de scikit-learn y un punto medio: exige un vecindario real sin volverse imposible.
+
+**eps = {EPS_DEFECTO}**
+- Se eligió mirando el gráfico **k-distance** (pestaña 1) y la grilla de **sensibilidad** (pestaña 3).
+- El codo visual de la curva está en ≈ 2.8–3.1, pero con min_samples = {MIN_SAMPLES_DEFECTO} y **eps ≥ 2.5 todos los vinos
+  se funden en 1 solo clúster** (no sirve para separar nada).
+- **eps = {EPS_DEFECTO} es el valor más grande que todavía mantiene 2 regiones densas separadas**, con el menor ruido posible
+  dentro de esa condición. Es una limitación conocida de DBSCAN cuando hay muchas variables (13 dimensiones).
+''')
+
     c_eps, c_ms = st.columns(2)
     eps = c_eps.slider("eps (radio de vecindad)", 0.10, 6.00, EPS_DEFECTO, 0.05, key="eps_dbscan",
-                       help="Cada cambio vuelve a ejecutar DBSCAN.")
-    min_samples = c_ms.slider("min_samples", 2, min(20, n), min(MIN_SAMPLES_DEFECTO, n), key="ms_dbscan")
+                       help="Tamaño del círculo alrededor de cada vino. Más grande = más vecinos = menos ruido, "
+                            "pero los grupos se terminan fusionando. Cada cambio vuelve a ejecutar DBSCAN.")
+    min_samples = c_ms.slider("min_samples", 2, min(20, n), min(MIN_SAMPLES_DEFECTO, n), key="ms_dbscan",
+                              help="Cuántos vinos (incluido él mismo) deben caer dentro del círculo para ser núcleo. "
+                                   "Más alto = criterio más estricto = más ruido.")
 
     labels = ajustar_dbscan(X, eps, min_samples)
     n_ruido = int((labels == -1).sum())
@@ -1607,30 +1711,79 @@ def pagina_dbscan():
         st.pyplot(fig)
         plt.close(fig)
         p50, p75, p90 = np.percentile(kdist, [50, 75, 90])
+        vecino = min_samples - 1
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Percentil 50", f"{p50:.2f}")
-        c2.metric("Percentil 75", f"{p75:.2f}")
-        c3.metric("Percentil 90", f"{p90:.2f}")
-        c4.metric("Puntos núcleo con este eps", f"{pct_nucleo:.1f} %")
-        st.caption(
-            "El eps adecuado suele ubicarse donde la curva empieza a subir con fuerza (codo). "
-            "Los puntos por encima de la línea roja no son núcleo: serán borde o ruido."
-        )
+        c1.metric("Percentil 50", f"{p50:.2f}",
+                  help=f"La mitad (50 %) de los vinos tiene a su {vecino}.º vecino a una distancia ≤ {p50:.2f}.")
+        c2.metric("Percentil 75", f"{p75:.2f}",
+                  help=f"El 75 % de los vinos tiene a su {vecino}.º vecino a una distancia ≤ {p75:.2f}.")
+        c3.metric("Percentil 90", f"{p90:.2f}",
+                  help=f"El 90 % de los vinos tiene a su {vecino}.º vecino a una distancia ≤ {p90:.2f}. "
+                       "El 10 % restante está muy aislado.")
+        c4.metric("Puntos núcleo con este eps", f"{pct_nucleo:.1f} %",
+                  help="Porcentaje de vinos cuya curva queda por debajo de la línea roja: tienen suficientes vecinos dentro de eps.")
+
+        caja_explicacion("📖 ¿Cómo leer este gráfico?", "#38bdf8", f'''
+            <ul style="margin: 0 0 6px 0; padding-left: 18px;">
+                <li>Para cada vino se mide la distancia a su <b>{vecino}.º vecino más cercano</b> (porque min_samples = {min_samples}
+                    cuenta al propio vino + {vecino} vecinos). Luego se ordenan de menor a mayor: eso es la <b>curva azul</b>.</li>
+                <li>Parte <b>plana a la izquierda</b> = vinos rodeados de otros parecidos (zonas densas).
+                    <b>Subida brusca a la derecha</b> = vinos aislados, candidatos a ruido.</li>
+                <li>La <b>línea roja</b> es el eps elegido. Todo vino cuya curva quede <b>debajo</b> es <b>núcleo</b>;
+                    lo que queda <b>encima</b> será borde o ruido.</li>
+            </ul>
+            <b>Las tarjetas de percentiles</b> son "reglas de referencia": por ejemplo, percentil 50 = {p50:.2f} significa que
+            <b>la mitad de los vinos</b> tiene a su {vecino}.º vecino a {p50:.2f} o menos. Si eps se pone cerca del percentil 50,
+            aproximadamente la mitad serán núcleo; cerca del percentil 90, casi todos.<br>
+            <b>Con eps = {eps:.2f}</b>, el <b>{pct_nucleo:.1f} %</b> de los vinos son núcleo
+            ({int(round(pct_nucleo * n / 100))} de {n}).
+        ''')
 
     # 2. Modelo
     with tab_mod:
         st.subheader(f"Resultado con eps = {eps:.2f} y min_samples = {min_samples}")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("N.º clústeres (sin -1)", n_clusters)
-        c2.metric("N.º puntos de ruido", n_ruido)
-        c3.metric("% ruido", f"{100 * n_ruido / n:.1f} %")
-        c4.metric("Cobertura", f"{100 * (n - n_ruido) / n:.1f} %")
+        pct_ruido = 100 * n_ruido / n
+        c1.metric("N.º clústeres (sin -1)", n_clusters,
+                  help="Cuántos grupos densos encontró DBSCAN. El ruido (-1) no cuenta como grupo.")
+        c2.metric("N.º puntos de ruido", n_ruido,
+                  help="Vinos que no tienen suficientes vecinos cerca: no pertenecen a ningún grupo.")
+        c3.metric("% ruido", f"{pct_ruido:.1f} %",
+                  help="Porcentaje de vinos que quedaron como ruido. Más de ~30 % suele indicar eps muy chico o min_samples muy alto.")
+        c4.metric("Cobertura", f"{100 * (n - n_ruido) / n:.1f} %",
+                  help="Porcentaje de vinos que sí quedaron en algún grupo (= 100 % − % ruido). K-Means siempre tiene 100 %.")
 
         c5, c6, c7 = st.columns(3)
-        c5.metric("Silhouette (sin ruido)", f"{met['Silhouette']:.3f}" if met else "No calculable")
-        c6.metric("Davies-Bouldin (sin ruido)", f"{met['Davies-Bouldin']:.3f}" if met else "No calculable")
-        c7.metric("Calinski-Harabasz (sin ruido)", f"{met['Calinski-Harabasz']:.1f}" if met else "No calculable")
-        st.caption("Las métricas se calculan solo sobre los puntos asignados a un clúster (se excluye -1).")
+        c5.metric("Silhouette (sin ruido)", f"{met['Silhouette']:.3f}" if met else "No calculable",
+                  help="¿Cada vino está más cerca de su grupo que del vecino? Rango −1 a 1. Mayor es mejor.")
+        c6.metric("Davies-Bouldin (sin ruido)", f"{met['Davies-Bouldin']:.3f}" if met else "No calculable",
+                  help="Qué tanto se parece cada grupo a su grupo más similar. Menor es mejor (0 = ideal).")
+        c7.metric("Calinski-Harabasz (sin ruido)", f"{met['Calinski-Harabasz']:.1f}" if met else "No calculable",
+                  help="Separación entre grupos ÷ dispersión dentro de los grupos. Mayor es mejor.")
+
+        if met:
+            sil = met["Silhouette"]
+            nivel_sil = ("grupos claramente separados" if sil >= 0.5
+                         else "grupos razonablemente separados" if sil >= 0.25 else "grupos débiles y solapados")
+            txt_metricas = (
+                f"Entre los vinos que sí quedaron agrupados, Silhouette = <b>{sil:.3f}</b> → {nivel_sil}. "
+                f"Davies-Bouldin = <b>{met['Davies-Bouldin']:.3f}</b> y Calinski-Harabasz = <b>{met['Calinski-Harabasz']:.1f}</b> "
+                "(mismo significado que en K-Means)."
+            )
+        else:
+            txt_metricas = "Con menos de 2 grupos no se pueden calcular las métricas de calidad."
+        caja_explicacion("📖 ¿Qué significan estos resultados?", "#f43f5e", f'''
+            <ul style="margin: 0 0 6px 0; padding-left: 18px;">
+                <li><b>Fila de arriba (cuántos y cuántos quedan fuera):</b> DBSCAN encontró <b>{n_clusters} grupo(s)</b> y dejó
+                    <b>{n_ruido} vinos ({pct_ruido:.1f} %) como ruido</b>. A diferencia de K-Means, DBSCAN <b>no obliga</b> a cada vino a
+                    entrar en un grupo: si un vino es "raro", lo deja fuera.</li>
+                <li><b>Fila de abajo (calidad de los grupos):</b> {txt_metricas}</li>
+                <li><b>⚠️ Ojo:</b> las métricas se calculan <b>sin el ruido</b>. Por eso pueden verse mejores que las de K-Means:
+                    DBSCAN ya descartó los vinos más difíciles de clasificar. No es una comparación 1 a 1.</li>
+                <li><b>Gráfico de barras:</b> cada barra es un grupo; la altura es cuántos vinos tiene y entre paréntesis su porcentaje.
+                    La barra <b>roja</b> es el ruido (-1).</li>
+            </ul>
+        ''')
 
         if n_clusters == 0:
             st.warning("Todos los puntos quedaron como ruido: eps es demasiado pequeño o min_samples demasiado alto.")
@@ -1684,11 +1837,32 @@ def pagina_dbscan():
             plt.tight_layout()
             col.pyplot(fig)
             plt.close(fig)
+        fila_ms = sens[sens["min_samples"] == MIN_SAMPLES_DEFECTO].sort_values("eps")
+        if not fila_ms.empty:
+            recorrido = " → ".join(
+                f"eps {r['eps']:g}: <b>{int(r['N.º clústeres'])}</b> grupo(s), {r['% ruido']:.0f} % ruido"
+                for _, r in fila_ms.iterrows()
+            )
+            txt_fila = (f"<br><b>Ejemplo con min_samples = {MIN_SAMPLES_DEFECTO}</b> (fila del medio), de izquierda a derecha:<br>"
+                        f"<span style='font-size:0.82rem;'>{recorrido}</span>")
+        else:
+            txt_fila = ""
+        caja_explicacion("📖 ¿Cómo leer los mapas de calor?", "#fbbf24", f'''
+            Cada <b>casilla</b> es una prueba de DBSCAN con una combinación distinta: la <b>columna</b> es el eps y la <b>fila</b> es min_samples.
+            <ul style="margin: 6px 0; padding-left: 18px;">
+                <li><b>Mapa azul (izquierda):</b> cuántos grupos se formaron. Azul oscuro = muchos grupos pequeños; casi blanco = 0 o 1 grupo.</li>
+                <li><b>Mapa rojo (derecha):</b> qué porcentaje de vinos quedó como ruido. Rojo oscuro = casi todo es ruido; claro = poco ruido.</li>
+            </ul>
+            <b>Qué se ve:</b> al <b>agrandar eps</b> (ir a la derecha) el ruido baja, pero los grupos se van fusionando hasta quedar en 1 solo.
+            Al <b>subir min_samples</b> (ir hacia abajo) el criterio es más estricto y aumenta el ruido.
+            <b>Criterio usado:</b> primero se fija min_samples = {MIN_SAMPLES_DEFECTO} (ver "¿Por qué...?" arriba) y luego se busca, en esa fila,
+            el <b>eps más grande que todavía forme al menos 2 grupos</b> (más eps = menos ruido).{txt_fila}<br>
+            Por eso se eligió <b>eps = {EPS_DEFECTO}</b>: es el último paso antes de que todo se convierta en un único grupo.
+            Con min_samples = 3 alguna casilla tiene menos ruido, pero su resultado es <b>inestable</b> (salta entre 1, 2 y 3 grupos
+            con cambios mínimos de eps) y el criterio de "3 vinos ya forman un grupo" es demasiado permisivo.<br>
+            La tabla de abajo muestra los mismos números con el Silhouette de cada combinación.
+        ''')
         st.dataframe(sens, hide_index=True, width="stretch")
-        st.caption(
-            "Pequeños cambios de eps alteran mucho el resultado: con eps bajo casi todo es ruido y con eps "
-            "alto todas las muestras se funden en un solo clúster."
-        )
 
     # 4. Visualización
     with tab_vis:
@@ -1709,9 +1883,21 @@ def pagina_dbscan():
         ax.legend(fontsize=8)
         st.pyplot(fig)
         plt.close(fig)
-        st.caption("La proyección PCA se usa solo para dibujar; DBSCAN se ejecutó con todas las variables.")
+        caja_explicacion("📖 ¿Cómo leer este gráfico?", "#34d399", f'''
+            <ul style="margin: 0 0 6px 0; padding-left: 18px;">
+                <li>Cada <b>punto</b> es un vino. Los <b>círculos de color</b> son vinos asignados a un grupo y las
+                    <b style="color:#f87171;">✕ rojas</b> son ruido (-1).</li>
+                <li>Los ejes <b>PC1 y PC2</b> son un "resumen" de las {d} variables en 2 dimensiones (PCA), solo para poder dibujarlas.
+                    Juntos muestran el {100 * (var_exp[0] + var_exp[1]):.1f} % de la información. DBSCAN se ejecutó con las {d} variables completas,
+                    por eso algunos puntos pueden verse "cerca" en el dibujo aunque en realidad estén lejos.</li>
+                <li>Fíjate dónde está el ruido: suele aparecer en las <b>zonas intermedias entre grupos</b> y en los <b>extremos</b>,
+                    es decir, vinos de transición o con valores químicos inusuales.</li>
+            </ul>
+        ''')
 
         st.markdown("**Media de cada grupo en unidades originales:**")
+        st.caption("Promedio de cada variable química por grupo. Compara columnas para ver qué distingue a cada grupo "
+                   "(por ejemplo, cuál tiene más alcohol o más flavonoides) y qué tan distinto es el ruido.")
         perfil = X_raw.groupby(labels).mean().round(2)
         perfil.index = ["Ruido (-1)" if g == -1 else f"Clúster {g}" for g in perfil.index]
         st.dataframe(perfil.T, width="stretch")
