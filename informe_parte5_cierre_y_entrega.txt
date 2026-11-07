@@ -139,42 +139,42 @@ Desde una perspectiva de ingeniería aplicada y ciencia de datos enológica:
 
 6.1 Cinco (5) Conclusiones Centrales con Sustento Cuantitativo
 --------------------------------------------------------------------------------
-1. Identificación de una estructura natural tripartita:
-   Tanto el método del codo (Inertia = 1,277.9) como la maximización del coeficiente de Silhouette (máximo global en K = 3 con 0.285) y la minimización del índice de Davies-Bouldin (1.389) corroboraron de manera puramente no supervisada la presencia de tres perfiles químicos naturales en el conjunto de 178 muestras, con un solapamiento inter-clúster moderado (Silhouette = 0.285) donde 172 de las 178 muestras (96.6%) quedaron asignadas en correspondencia con el cultivar agronómico dominante de cada grupo (59/59 en cultivar 0, 65/71 en cultivar 1 y 48/48 en cultivar 2).
+1. K = 3 es la mejor opción:
+   El codo y las tres métricas coinciden. Los grupos se solapan un poco (Silhouette 0.285), y 172 de 178 vinos (96.6 %) caen en un grupo dominado por un solo cultivar.
 
-2. Reducción y síntesis dimensional fidedigna mediante PCA:
-   Se demostró una alta redundancia en el espacio original de 13 dimensiones. Los dos primeros componentes principales retienen el 55.4% de la varianza total (PC1 con 36.2% y PC2 con 19.2%), mientras que un modelo tridimensional alcanza el 66.5%. Esta compresión ortogonal facilitó la visualización sin introducir distorsiones severas en la relación de distancias relativas.
+2. Las variables se parecen entre sí (PCA):
+   Con solo 2 ejes de PCA conservamos el 55.4 % de la información, y con 3, el 66.5 %. Por eso los gráficos en 2D sirven para ver, pero no muestran todo.
 
-3. Detección y aislamiento sistemático de anomalías con DBSCAN:
-   La calibración de DBSCAN (eps = 2.30, min_samples = 5) identificó 42 muestras clasificadas como ruido (-1) (23.6%). De las 17 muestras que presentaron algún valor atípico univariado de Tukey en el EDA, 13 fueron capturadas como ruido por DBSCAN (76.5% de los atípicos). Las otras 29 muestras de ruido corresponden a puntos situados en regiones hiperdimensionales de baja densidad o de frontera entre grupos.
+3. DBSCAN detecta muestras raras:
+   Marcó 42 como ruido (23.6 %), incluidas 13 de las 17 con valores atípicos de Tukey. Son muestras para revisar, no vinos defectuosos.
 
-4. Necesidad ineludible de estandarización multivariada:
-   Se comprobó cuantitativamente que la escala original de los datos estaba dominada por la variable prolina (rango de 1,402.0 y desviación estándar de 314.91) frente a compuestos traza como fenoles no flavonoides (rango de 0.53 y desviación de 0.12). La estandarización Z-Score (StandardScaler, media = 0, varianza = 1) equilibró las dimensiones e impidió que una sola variable dominara desproporcionadamente la suma de cuadrados de distancias euclídeas frente a compuestos traza como fenoles no flavonoides (rango 0.53).
+4. Estandarizar fue necesario:
+   Sin hacerlo, la prolina, con números muy grandes, habría dominado los grupos. Ahora todas las variables pesan igual.
 
-5. Complementariedad metodológica orientada a la cadena de valor:
-   La comparativa evidenció que K-Means y DBSCAN resuelven problemas comerciales distintos y complementarios. K-Means es la solución óptima para la catalogación y segmentación exhaustiva del 100% de los lotes vinícolas, mientras que DBSCAN se posiciona como el estándar para la detección de anomalías y aseguramiento de calidad analítica en laboratorio.
+5. Los dos métodos se complementan:
+   K-Means clasifica el 100 % de los vinos y DBSCAN señala los que conviene revisar. Falta validarlo con más datos.
 
 6.2 Tres (3) Limitaciones Técnicas del Estudio
 --------------------------------------------------------------------------------
-1. Restricción de esfericidad geométrica en K-Means:
-   El algoritmo presupone particiones convexas y simétricas, lo que genera una asignación rígida y forzada de las observaciones perimetrales. Muestras situadas en zonas de solapamiento entre perfiles son adjudicadas a un centroide sin reflejar el grado de incertidumbre enológica de la transición.
+1. Limitación 1: Supuesto de forma en K-Means:
+   K-Means asume grupos compactos y esféricos, y obliga a asignar cada muestra a un solo centroide. Con una Silhouette de 0.285 hay solapamiento moderado, por lo que las muestras de frontera se asignan a un perfil sin reflejar su incertidumbre.
 
-2. Alta sensibilidad paramétrica de DBSCAN en espacios continuos:
-   En un espacio hiperdimensional de 13 características, las distancias euclídeas tienden a dispersarse (maldición de la dimensionalidad). Como consecuencia, variaciones sutiles en el radio eps alteran notablemente el resultado: con min_samples = 5, eps = 2.2 produce 30.9% de ruido (2 clústeres), eps = 2.3 produce 23.6% de ruido (2 clústeres), eps = 2.4 produce 20.2% de ruido (2 clústeres), y eps = 2.5 produce 13.5% de ruido colapsando las muestras densas en un único macroclúster.
+2. Limitación 2: Sensibilidad de DBSCAN en 13 dimensiones:
+   Con muchas variables las distancias entre muestras tienden a parecerse, y no hay un umbral de densidad claro. Un cambio pequeño de eps altera el resultado: con eps = 2.3 se obtienen 2 clústeres, con 2.5 solo uno, y con 2.0 el ruido sube al 47.8 %. Además, sus métricas se calculan sin el ruido, lo que limita compararlas con las de K-Means.
 
-3. Restricción del dominio muestral:
-   El estudio se basa en un dataset histórico de 178 muestras circunscritas a una micro-región italiana específica. Los umbrales exactos de corte químico (como concentraciones de prolina > 1,000) no son directamente generalizables a vinos producidos en otras latitudes o con procesos enológicos modernos sin un nuevo calibrado del modelo.
+3. Limitación 3: Tamaño y alcance del dataset:
+   Son 178 muestras de una sola región de Italia y tres cultivares, con datos de 1991 y unidades de medida no documentadas. Los valores observados no deben aplicarse a otras regiones o vinos actuales sin recalibrar.
 
 6.3 Tres (3) Recomendaciones Prácticas y Futuras
 --------------------------------------------------------------------------------
-1. Adopción de una arquitectura de Machine Learning en cascada:
-   Se recomienda estructurar el pipeline de planta en dos etapas secuenciales: filtrar inicialmente los lotes cosechados con DBSCAN para detectar defectos o adulteraciones, y posteriormente aplicar K-Means (K=3) sobre las muestras conformes para clasificarlas en sus líneas comerciales de producto final.
+1. Recomendación 1: Usar los métodos en cascada, tras validarlos:
+   Aplicar DBSCAN como primer filtro para detectar muestras atípicas y K-Means con K = 3 sobre las restantes para asignarlas a uno de los tres perfiles. Antes de usarlo en un laboratorio, validar el procedimiento con más muestras y con la revisión de un experto sobre las marcadas como ruido.
 
-2. Aplicación de clustering sobre el espacio proyectado de PCA:
-   Para acelerar el entrenamiento y robustecer los algoritmos basados en densidad, se sugiere ejecutar DBSCAN sobre las coordenadas de las tres primeras componentes principales de PCA (PC1, PC2 y PC3), eliminando las dimensiones residuales que actúan como ruido aleatorio.
+2. Recomendación 2: Evaluar DBSCAN sobre componentes principales:
+   Probar DBSCAN sobre PC1-PC3 (66.5 % de la varianza) y comparar su estabilidad con la obtenida con las 13 variables, verificando que no se pierda información relevante.
 
-3. Integración de variables organolépticas y climáticas:
-   Enriquecer la matriz de características incorporando puntuaciones sensoriales de paneles de cata certificados (notas de cata, acidez percibida, astringencia tánica) y datos meteorológicos de la añada (insolación acumulada, pluviometría), cerrando la brecha entre la analítica instrumental y la experiencia del consumidor.
+3. Recomendación 3: Ampliar y enriquecer los datos:
+   Incorporar muestras de otras regiones y cosechas con unidades documentadas, y variables sensoriales (notas de cata, acidez percibida) y climáticas de la añada.
 
 ================================================================================
 7. REFERENCIAS BIBLIOGRÁFICAS (FORMATO APA 7)
